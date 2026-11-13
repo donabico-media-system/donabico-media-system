@@ -1,0 +1,32 @@
+name: Eathesen V3000 Daily Tensor & Entropy Audit
+
+on:
+  schedule:
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tensor-audit:
+    name: Deep Entropy & Tensor Variance Verification (Entropy = 0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: pip install --quiet requests
+
+      - name: Run Deep Tensor Audit Script
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python scripts/eathesen_tensor_audit.py
