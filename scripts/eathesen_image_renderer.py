@@ -4,7 +4,7 @@ EATHESEN V3000 SOTA — Autonomous Visual Asset Renderer (0-Cost Edge Pipeline)
 Primary Engine: Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell)
 Fallback Engine: Pollinations.ai (FLUX zero-auth backup)
 Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXXXX.jpg)
-Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Rate Limit Protected
+Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Multi-Token Fallback
 """
 
 import base64
@@ -18,10 +18,12 @@ from typing import Optional
 import requests
 from huggingface_hub import HfApi
 
-# Khai báo chính xác các biến môi trường
-CLASSIC_API_TOKEN = os.getenv("CLASSIC_API_TOKEN", "").strip().lstrip("\\")
+# Khai báo các biến môi trường
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
-HF_AUTH_TOKEN = CLASSIC_API_TOKEN if CLASSIC_API_TOKEN else HF_TOKEN
+CLASSIC_API_TOKEN = os.getenv("CLASSIC_API_TOKEN", "").strip().lstrip("\\")
+
+# Gom tất cả các Token hợp lệ vào một danh sách để thử nghiệm (Ưu tiên HF_TOKEN trước)
+VALID_TOKENS = [t for t in [HF_TOKEN, CLASSIC_API_TOKEN] if t]
 
 CLOUDFLARE_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
 CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
@@ -126,28 +128,36 @@ def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
 
 
 def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
-    if not HF_AUTH_TOKEN:
-        raise RuntimeError("CRITICAL: Missing CLASSIC_API_TOKEN / HF_TOKEN for Hugging Face upload.")
-
-    try:
-        api = HfApi(token=HF_AUTH_TOKEN)
-        
-        # NÂNG CẤP: Tự động tạo Repo nếu chưa tồn tại (tránh lỗi 401/404)
-        # exist_ok=True giúp bỏ qua nếu Repo đã có sẵn
-        api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
-        
-        api.upload_file(
-            path_or_fileobj=image_bytes,
-            path_in_repo=filename,
-            repo_id=repo_id,
-            repo_type="dataset",
-            commit_message=f"feat(visual): [¢24] Add deterministic cover artwork {filename}"
-        )
-        print(f"[HF UPLOAD] Successfully published binary asset {repo_id}/{filename} via HfApi")
-        return True
-    except Exception as exc:
-        print(f"[ERROR] Failed uploading cover to {repo_id} via HfApi: {exc}")
+    if not VALID_TOKENS:
+        print("[ERROR] CRITICAL: No HF_TOKEN or CLASSIC_API_TOKEN found.")
         return False
+
+    # NÂNG CẤP: Thử lần lượt từng Token (HF_TOKEN trước, rồi đến CLASSIC_API_TOKEN)
+    for idx, token in enumerate(VALID_TOKENS):
+        token_name = "HF_TOKEN" if token == HF_TOKEN else "CLASSIC_API_TOKEN"
+        try:
+            api = HfApi(token=token)
+            
+            # Tự động tạo Repo nếu chưa có
+            api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
+            
+            api.upload_file(
+                path_or_fileobj=image_bytes,
+                path_in_repo=filename,
+                repo_id=repo_id,
+                repo_type="dataset",
+                commit_message=f"feat(visual): [¢24] Add deterministic cover artwork {filename}"
+            )
+            print(f"[HF UPLOAD] Successfully published {repo_id}/{filename} using {token_name}")
+            return True
+        except Exception as exc:
+            print(f"[WARN] Upload failed using {token_name}: {exc}")
+            if idx < len(VALID_TOKENS) - 1:
+                print("[RETRY] Switching to next available token...")
+                time.sleep(1)
+
+    print("[ERROR] All provided Hugging Face tokens failed to upload.")
+    return False
 
 
 def main() -> int:
