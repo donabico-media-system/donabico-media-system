@@ -291,28 +291,34 @@ def write_cdn_artifacts(parity: str, datasets: List[Dict[str, Any]], distilled_s
 
     merged_list = sorted(merged_map.values(), key=lambda x: x["sequence"])
 
+    # =========================================================================
+    # NÂNG CẤP: PHÂN MẢNH 4 KÝ TỰ (SHARDING) - ĐỒNG BỘ VỚI ĐỊNH DẠNG PATH-XXXXX
+    # =========================================================================
     SHARD_SIZE = 1000
     total_shards = (len(merged_list) + SHARD_SIZE - 1) // SHARD_SIZE
     shard_endpoints = {}
 
+    # Dọn dẹp sạch sẽ các file part cũ (dù là 3 số hay 4 số)
     for f in os.listdir(CDN_DIR):
         if f.startswith("master-index-part-") and f.endswith(".json"):
             os.remove(os.path.join(CDN_DIR, f))
 
     for i in range(total_shards):
         part_data = merged_list[i * SHARD_SIZE : (i + 1) * SHARD_SIZE]
-        part_name = f"master-index-part-{i+1:03d}.json"
+        # ĐÃ FIX: Sử dụng :04d để tạo tên file 4 ký tự (part-0001.json)
+        part_name = f"master-index-part-{i+1:04d}.json"
         part_file = os.path.join(CDN_DIR, part_name)
         with open(part_file, "w", encoding="utf-8") as f:
             json.dump({"total": len(part_data), "datasets": part_data}, f, ensure_ascii=False, indent=2)
-        shard_endpoints[f"shard_{i+1:03d}"] = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/cdn/{part_name}"
+        # ĐÃ FIX: Endpoint cũng đồng bộ 4 ký tự
+        shard_endpoints[f"shard_{i+1:04d}"] = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/cdn/{part_name}"
 
     master_payload = {
         "system": "EATHESEN V3000 SOTA — Master Global Index (Sharded)",
         "anchor": "¢24", "boolean_checksum": 1, "updated_at": now_iso,
         "total_repositories": len(merged_list), "total_shards": total_shards,
         "shard_endpoints": shard_endpoints,
-        "recent_datasets": merged_list[-100:],
+        "recent_datasets": merged_list[-100:],  # 100 bài mới nhất cho RSS
     }
     with open(MASTER_INDEX_FILE, "w", encoding="utf-8") as f: json.dump(master_payload, f, ensure_ascii=False, indent=2)
 
