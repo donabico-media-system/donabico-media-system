@@ -23,8 +23,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install HTTP Dependencies
-        run: pip install --quiet requests
+      - name: Install Dependencies
+        run: pip install --quiet requests huggingface_hub
 
       - name: Execute Autonomous Visual Renderer
         env:
