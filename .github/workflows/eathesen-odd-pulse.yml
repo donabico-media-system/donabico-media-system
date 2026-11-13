@@ -41,11 +41,12 @@ jobs:
         run: |
           git config user.name "donabico-media-system"
           git config user.email "support@donabicomedia.com"
-          git pull --rebase -X ours origin main
           git add cdn/
           if git diff --staged --quiet; then
             echo "No CDN changes detected."
           else
             git commit -m "chore(cdn): [¢24] donabico-media-system Odd-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            # Kéo code mới nhất và tự động ưu tiên code vừa chạy (-X ours)
+            git pull origin main --no-rebase -X ours
             git push origin main
           fi
