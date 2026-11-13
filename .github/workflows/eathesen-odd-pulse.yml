@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        run: pip install --quiet requests
+        run: pip install --quiet requests huggingface_hub
 
       - name: Execute Odd-Parity Sequential Audit & Edge Distillation
         env:
