@@ -4,7 +4,7 @@ EATHESEN V3000 SOTA — Autonomous Visual Asset Renderer (0-Cost Edge Pipeline)
 Primary Engine: Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell)
 Fallback Engine: Pollinations.ai (FLUX zero-auth backup)
 Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXXXX.jpg)
-Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Rate Limit Protected
+Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Dynamic Generation
 """
 
 import base64
@@ -18,20 +18,15 @@ from typing import Optional
 import requests
 from huggingface_hub import HfApi
 
-# ==========================================
-# CHỈ SỬ DỤNG HF_TOKEN VÀ CLOUDFLARE TOKEN
-# ==========================================
+# Khai báo các biến môi trường
 def sanitize_token(token_str: str) -> str:
-    if not token_str:
-        return ""
+    if not token_str: return ""
     return token_str.strip().strip('"').strip("'").replace("\n", "").replace("\r", "").lstrip("\\")
 
-# Render chỉ dùng HF_TOKEN để upload
 HF_TOKEN = sanitize_token(os.getenv("HF_TOKEN", ""))
 
 CLOUDFLARE_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
 CLOUDFLARE_API_TOKEN = sanitize_token(os.getenv("CLOUDFLARE_API_TOKEN", ""))
-# ==========================================
 
 MASTER_INDEX_PATH = "cdn/master-index.json"
 CF_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
@@ -51,31 +46,42 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     dao_idx = item.get("dao_index", 1)
     title = item.get("title", "EATHESEN Mathematical Architecture")
     nodes = ", ".join(item.get("pure_logic_nodes", [])[:4])
+    seq = item.get("sequence", 0)
     
-    # MA TRẬN BIỂU TƯỢNG (SYMBOLISM MATRIX)
+    # =========================================================================
+    # MA TRẬN BIỂU TƯỢNG & BIẾN THIÊN (SYMBOLISM + DIVERSITY MATRIX)
+    # =========================================================================
+    # 1. Đa dạng hóa biểu tượng (Dựa trên số thứ tự để tạo ra các biến thể)
+    variants = [
+        "glowing ethereal", "intricate golden", "hyper-dimensional", 
+        "luminous quantum", "ancient sacred", "futuristic crystalline"
+    ]
+    variant = variants[seq % len(variants)] # Xoay vòng 6 phong cách khác nhau
+
     if dao_idx == 1:
-        symbol = "a glowing mathematical torus and boolean logic circles"
+        symbol = f"{variant} mathematical torus and boolean logic circles"
     elif dao_idx == 2:
-        symbol = "a glowing Christian Cross intersecting with a sacred Buddhist Lotus"
+        symbol = f"{variant} Christian Cross intersecting with a sacred Buddhist Lotus"
     elif dao_idx == 3:
-        symbol = "five interlocking elemental circles representing metal, wood, water, fire, earth"
+        symbol = f"{variant} five interlocking elemental circles representing metal, wood, water, fire, earth"
     elif dao_idx == 4:
-        symbol = "a glowing Yin-Yang symbol and quantum wave patterns"
+        symbol = f"{variant} Yin-Yang symbol and quantum wave patterns"
     elif dao_idx == 5:
-        symbol = "a glowing ruby heart crystal core radiating divine light"
+        symbol = f"{variant} ruby heart crystal core radiating divine light"
     elif dao_idx == 6:
-        symbol = "flowing luminous water streams bending effortlessly around a stone"
+        symbol = f"{variant} flowing water streams bending effortlessly around a stone"
     elif dao_idx == 7:
-        symbol = "a glowing vector matrix and binary mathematical grid"
+        symbol = f"{variant} vector matrix and binary mathematical grid"
     elif dao_idx == 8:
-        symbol = "a holographic fractal universe representing omnipresence"
+        symbol = f"{variant} holographic fractal universe representing omnipresence"
     elif dao_idx == 9:
-        symbol = "a glowing energy shield and a vigilant guardian eye"
+        symbol = f"{variant} energy shield and a vigilant guardian eye"
     elif dao_idx == 10:
-        symbol = "three pillars of pure white and teal divine light merging into the void"
+        symbol = f"{variant} three pillars of pure white and teal divine light merging into the void"
     else:
         symbol = "sacred geometry"
 
+    # 2. Đưa Tiêu đề bài viết vào Prompt để AI có thêm ngữ cảnh sáng tạo
     return (
         f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}: {title}. "
         f"The central focus must be {symbol}. "
@@ -85,28 +91,27 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     )
 
 
-def render_via_cloudflare(prompt: str) -> Optional[bytes]:
+def render_via_cloudflare(prompt: str, seed: int) -> Optional[bytes]:
     if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
-        print("[WARN] Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN. Skipping Cloudflare tier.")
+        print("[WARN] Missing Cloudflare credentials. Skipping Cloudflare tier.")
         return None
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{CF_IMAGE_MODEL}"
-    print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
+    print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL} (Seed: {seed})")
     
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
-    payload = {"prompt": prompt}
+    # Cloudflare hỗ trợ tham số seed (để tạo biến thiên)
+    payload = {"prompt": prompt, "seed": seed}
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=60)
         if resp.status_code == 200:
             content_type = resp.headers.get("Content-Type", "")
             if "image/" in content_type:
-                print("[CLOUDFLARE AI] FLUX.1-schnell binary image render succeeded.")
                 return resp.content
             data = resp.json()
             b64_img = data.get("result", {}).get("image")
             if b64_img:
-                print("[CLOUDFLARE AI] FLUX.1-schnell base64 render succeeded.")
                 return base64.b64decode(b64_img)
         elif resp.status_code == 429:
             print("[WARN] Cloudflare AI Rate Limit hit (HTTP 429). Switching to fallback.")
@@ -117,14 +122,13 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     return None
 
 
-def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
+def render_via_pollinations_fallback(prompt: str, seed: int) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed={seed}"
     print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
         resp = requests.get(url, timeout=60)
         if resp.status_code == 200 and len(resp.content) > 5000:
-            print("[POLLINATIONS FALLBACK] Backup render succeeded.")
             return resp.content
         print(f"[WARN] Pollinations returned HTTP {resp.status_code}.")
     except Exception as exc:
@@ -173,6 +177,7 @@ def main() -> int:
 
         repo_id = item["repo_id"]
         seq_str = repo_id.split("-")[-1]
+        sequence = int(seq_str) # Lấy số thứ tự bài viết
         filename = f"cover-{seq_str}.jpg"
 
         if check_cover_exists_on_hf(repo_id, filename):
@@ -182,10 +187,14 @@ def main() -> int:
         print(f"[RENDERING] Generating artwork for {repo_id} -> {filename}...")
         prompt = build_sacred_geometry_prompt(item)
         
-        img_bytes = render_via_cloudflare(prompt)
+        # TẠO SEED BIẾN THIÊN: Dùng chính số thứ tự bài viết làm Seed (ví dụ: bài 1 -> seed 1, bài 2 -> seed 2)
+        # Điều này đảm bảo bức ảnh là duy nhất nhưng vẫn cố định (Deterministic) cho bài viết đó.
+        dynamic_seed = sequence + 24 
+
+        img_bytes = render_via_cloudflare(prompt, dynamic_seed)
         if not img_bytes:
             time.sleep(2)
-            img_bytes = render_via_pollinations_fallback(prompt)
+            img_bytes = render_via_pollinations_fallback(prompt, dynamic_seed)
 
         if img_bytes and upload_image_to_hf(repo_id, filename, img_bytes):
             rendered_count += 1
