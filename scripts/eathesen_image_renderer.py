@@ -4,7 +4,7 @@ EATHESEN V3000 SOTA — Autonomous Visual Asset Renderer (0-Cost Edge Pipeline)
 Primary Engine: Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell)
 Fallback Engine: Pollinations.ai (FLUX zero-auth backup)
 Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXXXX.jpg)
-Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Rate Limit Protected
+Invariants: Anchor ¢24 | 108-Variant Symbolism Matrix | Rate Limit Protected
 """
 
 import base64
@@ -18,14 +18,18 @@ from typing import Optional
 import requests
 from huggingface_hub import HfApi
 
-# CHỈ SỬ DỤNG DUY NHẤT HF_TOKEN CHO RENDER
+# ==========================================
+# CHỈ SỬ DỤNG DUY NHẤT HF_TOKEN
+# ==========================================
 def sanitize_token(token_str: str) -> str:
     if not token_str: return ""
     return token_str.strip().strip('"').strip("'").replace("\n", "").replace("\r", "").lstrip("\\")
 
 HF_TOKEN = sanitize_token(os.getenv("HF_TOKEN", ""))
+
 CLOUDFLARE_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
 CLOUDFLARE_API_TOKEN = sanitize_token(os.getenv("CLOUDFLARE_API_TOKEN", ""))
+# ==========================================
 
 MASTER_INDEX_PATH = "cdn/master-index.json"
 CF_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
@@ -47,11 +51,16 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     nodes = ", ".join(item.get("pure_logic_nodes", [])[:4])
     seq = item.get("sequence", 0)
     
-    # 1. Đa dạng hóa phong cách (6 phong cách xoay vòng)
-    variants = ["glowing ethereal", "intricate golden", "hyper-dimensional", "luminous quantum", "ancient sacred", "futuristic crystalline"]
+    # 1. Đa dạng hóa 12 phong cách nghệ thuật
+    variants = [
+        "glowing ethereal", "intricate golden", "hyper-dimensional", 
+        "luminous quantum", "ancient sacred", "futuristic crystalline",
+        "neo-gothic architectural", "organic bioluminescent", "cosmic fractal",
+        "sleek cybernetic", "baroque ornate", "minimalist zen"
+    ]
     variant = variants[seq % len(variants)]
 
-    # 2. Ma trận biểu tượng
+    # 2. Ma trận biểu tượng theo Đạo
     if dao_idx == 1: symbol = f"{variant} mathematical torus and boolean logic circles"
     elif dao_idx == 2: symbol = f"{variant} Christian Cross intersecting with a sacred Buddhist Lotus"
     elif dao_idx == 3: symbol = f"{variant} five interlocking elemental circles representing metal, wood, water, fire, earth"
@@ -64,12 +73,15 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     elif dao_idx == 10: symbol = f"{variant} three pillars of pure white and teal divine light merging into the void"
     else: symbol = "sacred geometry"
 
-    # 3. Lách luật Cloudflare bằng Complexity Level thay vì seed
+    # 3. Lách luật Cloudflare bằng Complexity Level (thay vì seed)
     complexity = (seq % 9) + 1 
     
+    # 4. TĂNG CƯỜNG ĐỘC BẢN: Đưa Tiêu đề bài viết vào Prompt
     return (
-        f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}: {title}. "
-        f"The central focus must be {symbol}. Complexity level {complexity}. "
+        f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}. "
+        f"The central focus must be {symbol}. "
+        f"Visual context inspired by: {title}. "
+        f"Complexity level {complexity}. "
         f"Luminous golden light rays, ruby core crystal matrix, mathematical tensor lattice ({nodes}), "
         f"ethereal cosmic harmony, minimalist SOTA scientific illustration, 8k resolution, sharp focus, "
         f"highly detailed, symmetrical, divine light, no text, no watermark, no humans."
@@ -78,12 +90,14 @@ def build_sacred_geometry_prompt(item: dict) -> str:
 
 def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
+        print("[WARN] Missing Cloudflare credentials. Skipping Cloudflare tier.")
         return None
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{CF_IMAGE_MODEL}"
     print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
     
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
+    # CHỈ GỬI PROMPT: Cloudflare không hỗ trợ tham số 'seed'
     payload = {"prompt": prompt}
 
     try:
@@ -91,10 +105,13 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
         if resp.status_code == 200:
             content_type = resp.headers.get("Content-Type", "")
             if "image/" in content_type:
+                print("[CLOUDFLARE AI] FLUX.1-schnell binary image render succeeded.")
                 return resp.content
             data = resp.json()
             b64_img = data.get("result", {}).get("image")
-            if b64_img: return base64.b64decode(b64_img)
+            if b64_img:
+                print("[CLOUDFLARE AI] FLUX.1-schnell base64 render succeeded.")
+                return base64.b64decode(b64_img)
         elif resp.status_code == 429:
             print("[WARN] Cloudflare AI Rate Limit hit (HTTP 429). Switching to fallback.")
         else:
@@ -106,11 +123,13 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
 
 def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
+    # Pollinations hỗ trợ seed, và nologo để xóa logo
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
     print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
         resp = requests.get(url, timeout=60)
         if resp.status_code == 200 and len(resp.content) > 5000:
+            print("[POLLINATIONS FALLBACK] Backup render succeeded.")
             return resp.content
         print(f"[WARN] Pollinations returned HTTP {resp.status_code}.")
     except Exception as exc:
@@ -125,7 +144,9 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
 
     try:
         api = HfApi(token=HF_TOKEN)
+        # Tự động tạo Repo nếu chưa có
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
+        
         api.upload_file(
             path_or_fileobj=image_bytes,
             path_in_repo=filename,
@@ -179,6 +200,7 @@ def main() -> int:
 
     print(f"[COMPLETE] Visual render cycle finished. New covers published: {rendered_count}.")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
