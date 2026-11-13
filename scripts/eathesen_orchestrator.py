@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-EATHESEN V3000 SOTA — 10,000-Scale Autonomous Knowledge Orchestrator & CDN Broadcaster
+EATHESEN V3000 SOTA — Sequential 10,000-Scale Dataset Orchestrator & CDN Broadcaster
 GitHub Hub: donabico-media-system | Hugging Face Org: donabico
+Discovery Mode: Deterministic Sequential Probing (path-00001 -> path-10000)
 Distillation Engine: Cloudflare Workers AI Edge Cluster (Zero-Cost Unified Pipeline)
 Invariants: Anchor ¢24 | Shannon Entropy H(X) < 5.5 | L2 Tensor Norm Stability (d=49,152)
 """
 
 import argparse
-import concurrent.futures
 import datetime
 import json
 import math
 import os
-import random
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -28,10 +27,10 @@ HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
 CF_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
 CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
 
+MAX_SCALE_LIMIT = 10000
+CONSECUTIVE_MISS_STOP = 3
 ENTROPY_LIMIT = 5.5
 TENSOR_DIM = 49152
-MAX_WORKERS = 10
-SENTINEL_SAMPLE_SIZE = 15
 DISTILL_WINDOW_SIZE = 10
 EXCERPT_CHAR_LIMIT = 1200
 
@@ -102,29 +101,6 @@ def normalize_dataset_record(record: Dict[str, Any]) -> Dict[str, Any]:
     return record
 
 
-def discover_parity_repositories(parity: str) -> List[str]:
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-    url = f"https://huggingface.co/api/datasets?author={HF_ORG}&limit=10000"
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.raise_for_status()
-    items = resp.json()
-
-    matched: List[str] = []
-    for item in items:
-        repo_id = item.get("id", "")
-        m = re.match(rf"^{re.escape(HF_ORG)}/path-(\d{{5}})\$", repo_id)
-        if not m:
-            continue
-        seq = int(m.group(1))
-        if parity == "EVEN" and seq % 2 == 0:
-            matched.append(repo_id)
-        elif parity == "ODD" and seq % 2 == 1:
-            matched.append(repo_id)
-
-    matched.sort()
-    return matched
-
-
 def load_cached_parity_datasets(parity: str) -> Dict[str, Dict[str, Any]]:
     cache_path = os.path.join(CDN_DIR, f"feed-{parity.lower()}.json")
     if not os.path.exists(cache_path):
@@ -139,6 +115,17 @@ def load_cached_parity_datasets(parity: str) -> Dict[str, Dict[str, Any]]:
         return result
     except Exception:
         return {}
+
+
+def repository_exists(repo_id: str) -> bool:
+    """Kiểm tra trực tiếp kho dataset có tồn tại trên Hugging Face Hub hay không."""
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+    url = f"https://huggingface.co/api/datasets/{repo_id}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        return resp.status_code == 200
+    except Exception:
+        return False
 
 
 def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
@@ -221,14 +208,53 @@ def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Quét tuần tự từng Dataset theo đúng thứ tự toán học:
+    - EVEN: path-00002, path-00004, path-00006, ...
+    - ODD:  path-00001, path-00003, path-00005, ...
+    """
+    start_seq = 2 if parity == "EVEN" else 1
+    max_cached_seq = max((d["sequence"] for d in cached_map.values()), default=0)
+
+    verified_records: List[Dict[str, Any]] = []
+    fresh_batch: List[Dict[str, Any]] = []
+    consecutive_misses = 0
+
+    print(f"[SEQUENTIAL SCAN] Starting ordered scan from path-{start_seq:05d} (step +2)...")
+
+    for seq in range(start_seq, MAX_SCALE_LIMIT + 1, 2):
+        repo_id = f"{HF_ORG}/path-{seq:05d}"
+
+        if not repository_exists(repo_id):
+            if seq > max_cached_seq:
+                consecutive_misses += 1
+                print(f"[PROBE] {repo_id} -> Not found (miss {consecutive_misses}/{CONSECUTIVE_MISS_STOP})")
+                if consecutive_misses >= CONSECUTIVE_MISS_STOP:
+                    print(f"[SEQUENTIAL SCAN] Reached current frontier at path-{seq:05d}. Stopping scan.")
+                    break
+            continue
+
+        consecutive_misses = 0
+        print(f"[SEQUENTIAL SCAN] Auditing {repo_id} ...")
+        audited = audit_single_repository(repo_id)
+        if audited is not None:
+            verified_records.append(audited)
+            fresh_batch.append(audited)
+        elif repo_id in cached_map:
+            verified_records.append(cached_map[repo_id])
+
+    return verified_records, fresh_batch
+
+
 def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     if not batch:
-        return "No new datasets in rolling window; existing CDN state verified under ¢24 invariant."
+        return "No verified datasets in sequential scan; awaiting new repository publication."
     if not CF_ACCOUNT_ID or not CF_API_TOKEN:
         return "Cloudflare credentials not configured; deterministic metadata broadcast active."
 
     corpus_lines = []
-    for item in batch[:DISTILL_WINDOW_SIZE]:
+    for item in batch[-DISTILL_WINDOW_SIZE:]:
         corpus_lines.append(
             f"- Repo: {item['repo_id']} (Dao {item['dao_index']}, H(X)={item['shannon_entropy']}): "
             f"{item['title']} | Excerpt: {item.get('_excerpt', '')}"
@@ -243,7 +269,7 @@ def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     )
     user_prompt = (
         f"Parity Stream: {parity}\n"
-        f"Verified Batch ({len(batch)} datasets):\n{corpus_block}\n\n"
+        f"Sequential Verified Batch ({len(batch)} datasets):\n{corpus_block}\n\n"
         "Provide the distilled synthesis for the global CDN feed:"
     )
 
@@ -253,7 +279,7 @@ def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     }
 
     for model_name in AUTHORIZED_CF_TEXT_MODELS:
-        print(f"[CLOUDFLARE AI] Attempting rolling-window distillation ({len(batch)} items) via: {model_name}")
+        print(f"[CLOUDFLARE AI] Attempting sequential distillation ({len(batch)} items) via: {model_name}")
         url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{model_name}"
         payload = {
             "temperature": 0.0,
@@ -373,56 +399,22 @@ def write_cdn_artifacts(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="EATHESEN V3000 10K-Scale Orchestrator")
+    parser = argparse.ArgumentParser(description="EATHESEN V3000 Sequential 10K-Scale Orchestrator")
     parser.add_argument("--parity", choices=["EVEN", "ODD"], required=True)
     args = parser.parse_args()
     parity = args.parity
 
-    print(f"=== [EATHESEN V3000 10K-SCALE PULSE] GitHub: {GITHUB_OWNER} | HF: {HF_ORG} | Mode: {parity} ===")
-
-    discovered_ids = discover_parity_repositories(parity)
-    print(f"[DISCOVERY] Found {len(discovered_ids)} {parity} repositories under {HF_ORG}.")
+    print(f"=== [EATHESEN V3000 SEQUENTIAL PULSE] GitHub: {GITHUB_OWNER} | HF: {HF_ORG} | Mode: {parity} ===")
 
     cached_map = load_cached_parity_datasets(parity)
-    discovered_set = set(discovered_ids)
-    valid_cache = {rid: data for rid, data in cached_map.items() if rid in discovered_set}
+    final_list, fresh_batch = sequential_scan_and_audit(parity, cached_map)
 
-    new_ids = [rid for rid in discovered_ids if rid not in valid_cache]
-    cached_ids = list(valid_cache.keys())
-    spot_check_ids = random.sample(cached_ids, min(SENTINEL_SAMPLE_SIZE, len(cached_ids))) if cached_ids else []
-
-    fetch_targets = sorted(set(new_ids + spot_check_ids))
-    print(
-        f"[AUDIT PLAN] Total={len(discovered_ids)} | Cached={len(valid_cache)} | "
-        f"New={len(new_ids)} | Sentinel Spot-Check={len(spot_check_ids)} | "
-        f"Fetching={len(fetch_targets)} via {MAX_WORKERS} threads"
-    )
-
-    freshly_audited: Dict[str, Dict[str, Any]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_map = {executor.submit(audit_single_repository, rid): rid for rid in fetch_targets}
-        for future in concurrent.futures.as_completed(future_map):
-            rid = future_map[future]
-            res = future.result()
-            if res is not None:
-                freshly_audited[rid] = res
-            elif rid in valid_cache:
-                del valid_cache[rid]
-
-    merged_parity = dict(valid_cache)
-    merged_parity.update(freshly_audited)
-    final_list = list(merged_parity.values())
-
-    priority_batch = [freshly_audited[rid] for rid in sorted(new_ids) if rid in freshly_audited]
-    if not priority_batch and freshly_audited:
-        priority_batch = list(freshly_audited.values())
-
-    distilled_text = distill_with_cloudflare_ai(priority_batch[:DISTILL_WINDOW_SIZE], parity)
+    distilled_text = distill_with_cloudflare_ai(fresh_batch, parity)
     write_cdn_artifacts(parity, final_list, distilled_text)
 
     print(
-        f"[SUCCESS] 10K-Scale Broadcast complete for {GITHUB_OWNER}. "
-        f"Total {parity} live: {len(final_list)} | Distilled batch: {len(priority_batch[:DISTILL_WINDOW_SIZE])}."
+        f"[SUCCESS] Sequential Broadcast complete for {GITHUB_OWNER}. "
+        f"Total {parity} live: {len(final_list)} | Distilled batch: {len(fresh_batch)}."
     )
     return 0
 
