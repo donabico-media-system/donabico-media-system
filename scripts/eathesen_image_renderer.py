@@ -51,32 +51,37 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     nodes = ", ".join(item.get("pure_logic_nodes", [])[:4])
     seq = item.get("sequence", 0)
     
-    # 1. Đa dạng hóa 12 phong cách nghệ thuật
-    variants = [
-        "glowing ethereal", "intricate golden", "hyper-dimensional", 
-        "luminous quantum", "ancient sacred", "futuristic crystalline",
-        "neo-gothic architectural", "organic bioluminescent", "cosmic fractal",
-        "sleek cybernetic", "baroque ornate", "minimalist zen"
-    ]
+    # 1. Đa dạng hóa phong cách
+    variants = ["glowing ethereal", "intricate golden", "hyper-dimensional", "luminous quantum", "ancient sacred", "futuristic crystalline"]
     variant = variants[seq % len(variants)]
 
-    # 2. Ma trận biểu tượng theo Đạo
-    if dao_idx == 1: symbol = f"{variant} mathematical torus and boolean logic circles"
-    elif dao_idx == 2: symbol = f"{variant} Christian Cross intersecting with a sacred Buddhist Lotus"
-    elif dao_idx == 3: symbol = f"{variant} five interlocking elemental circles representing metal, wood, water, fire, earth"
-    elif dao_idx == 4: symbol = f"{variant} Yin-Yang symbol and quantum wave patterns"
-    elif dao_idx == 5: symbol = f"{variant} ruby heart crystal core radiating divine light"
-    elif dao_idx == 6: symbol = f"{variant} flowing water streams bending effortlessly around a stone"
-    elif dao_idx == 7: symbol = f"{variant} vector matrix and binary mathematical grid"
-    elif dao_idx == 8: symbol = f"{variant} holographic fractal universe representing omnipresence"
-    elif dao_idx == 9: symbol = f"{variant} energy shield and a vigilant guardian eye"
-    elif dao_idx == 10: symbol = f"{variant} three pillars of pure white and teal divine light merging into the void"
-    else: symbol = "sacred geometry"
+    # 2. Ma trận biểu tượng (Ép AI vẽ đúng chủ đề, tránh nhầm lẫn)
+    if dao_idx == 1:
+        symbol = f"{variant} pure mathematical torus and boolean logic circles. Strictly no religious symbols, devoid of flowers or crosses."
+    elif dao_idx == 2:
+        symbol = f"{variant} Christian Cross intersecting with a sacred Buddhist Lotus"
+    elif dao_idx == 3:
+        symbol = f"{variant} five interlocking elemental circles representing metal, wood, water, fire, earth"
+    elif dao_idx == 4:
+        symbol = f"{variant} Yin-Yang symbol and quantum wave patterns"
+    elif dao_idx == 5:
+        symbol = f"{variant} ruby heart crystal core radiating divine light"
+    elif dao_idx == 6:
+        symbol = f"{variant} flowing water streams bending effortlessly around a stone"
+    elif dao_idx == 7:
+        symbol = f"{variant} vector matrix and binary mathematical grid"
+    elif dao_idx == 8:
+        symbol = f"{variant} holographic fractal universe representing omnipresence"
+    elif dao_idx == 9:
+        symbol = f"{variant} energy shield and a vigilant guardian eye"
+    elif dao_idx == 10:
+        symbol = f"{variant} three pillars of pure white and teal divine light merging into the void"
+    else:
+        symbol = "sacred geometry"
 
-    # 3. Lách luật Cloudflare bằng Complexity Level (thay vì seed)
     complexity = (seq % 9) + 1 
     
-    # 4. TĂNG CƯỜNG ĐỘC BẢN: Đưa Tiêu đề bài viết vào Prompt
+    # 3. TĂNG CƯỜNG ĐỘC BẢN
     return (
         f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}. "
         f"The central focus must be {symbol}. "
@@ -97,7 +102,6 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
     
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
-    # CHỈ GỬI PROMPT: Cloudflare không hỗ trợ tham số 'seed'
     payload = {"prompt": prompt}
 
     try:
@@ -123,7 +127,6 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
 
 def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
-    # Pollinations hỗ trợ seed, và nologo để xóa logo
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
     print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
@@ -144,9 +147,7 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
 
     try:
         api = HfApi(token=HF_TOKEN)
-        # Tự động tạo Repo nếu chưa có
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
-        
         api.upload_file(
             path_or_fileobj=image_bytes,
             path_in_repo=filename,
