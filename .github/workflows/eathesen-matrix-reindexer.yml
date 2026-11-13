@@ -1,0 +1,42 @@
+name: Eathesen V3000 Matrix Reindexer & Cache Purge
+
+on:
+  schedule:
+    - cron: '45 3,15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  matrix-reindex:
+    name: Reindex Global Matrix & Purge Stale Caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Execute Matrix Reindexing Script
+        run: python scripts/eathesen_reindexer.py
+
+      - name: Commit & Push Reindexed CDN State
+        run: |
+          git config user.name "donabico-media-system"
+          git config user.email "support@donabicomedia.com"
+          git add cdn/
+          if git diff --staged --quiet; then
+            echo "No reindexing changes needed."
+          else
+            git commit -m "chore(matrix): [¢24] Global CDN Matrix Reindexed $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git pull --rebase -X ours origin main
+            git push origin main
+          fi
