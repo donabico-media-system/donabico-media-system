@@ -1,0 +1,48 @@
+name: Eathesen V3000 Even-Parity Pulse (10K-Scale CDN)
+
+on:
+  schedule:
+    - cron: '0 0,4,8,12,16,20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  even-parity-orchestrator:
+    name: Even-Parity Discovery, Entropy Audit & Groq Distillation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository & Incremental CDN Cache
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: pip install --quiet requests
+
+      - name: Execute Even-Parity Discovery, Entropy Audit & Groq Distillation
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python scripts/eathesen_orchestrator.py --parity EVEN
+
+      - name: Publish & Broadcast CDN Feed (HTTP 200 OK)
+        run: |
+          git config user.name "donabico-media-system"
+          git config user.email "support@donabicomedia.com"
+          git add cdn/
+          if git diff --staged --quiet; then
+            echo "No CDN changes detected."
+          else
+            git commit -m "chore(cdn): [¢24] donabico-media-system Even-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git pull --rebase -X ours origin main
+            git push origin main
+          fi
