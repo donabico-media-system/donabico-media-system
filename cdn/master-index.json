@@ -2,7 +2,7 @@
   "system": "EATHESEN V3000 SOTA — Master Global Index",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "updated_at": "2026-11-13T09:28:53Z",
+  "updated_at": "2026-11-13T09:33:03Z",
   "total_repositories": 1,
   "cdn_endpoints": {
     "master_index": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index.json",
