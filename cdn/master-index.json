@@ -4,9 +4,21 @@
   "hf_owner": "donabico",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "last_heartbeat_utc": "2026-11-13T07:40:54Z",
-  "total_live_datasets": 1,
+  "last_heartbeat_utc": "2026-11-13T07:45:40Z",
+  "total_live_datasets": 2,
   "datasets": [
+    {
+      "repo_id": "donabico/path-00001",
+      "dao_index": 1,
+      "title": "Unified Truth and Pure Logic: A 24-Law Boolean Architecture for Hallucination-Free AI Systems",
+      "shannon_entropy": 5.031142,
+      "pure_logic_nodes": [
+        "NODE_DAO_1",
+        "NODE_C24_INVARIANT"
+      ],
+      "hf_url": "https://huggingface.co/datasets/donabico/path-00001",
+      "parquet_cdn_api": "https://datasets-server.huggingface.co/rows?dataset=donabico/path-00001&config=default&split=train&offset=0&length=1"
+    },
     {
       "repo_id": "donabico/path-00002",
       "dao_index": 2,
