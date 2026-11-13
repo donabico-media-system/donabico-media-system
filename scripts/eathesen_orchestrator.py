@@ -1,4 +1,3 @@
-```python
 #!/usr/bin/env python3
 """
 EATHESEN V3000 SOTA — 10,000-Scale Autonomous Knowledge Orchestrator & CDN Broadcaster
