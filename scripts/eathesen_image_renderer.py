@@ -4,6 +4,7 @@ EATHESEN V3000 SOTA — Autonomous Visual Asset Renderer (0-Cost Edge Pipeline)
 Primary Engine: Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell)
 Fallback Engine: Pollinations.ai (FLUX zero-auth backup)
 Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXXXX.jpg)
+Invariants: Anchor ¢24 | Rate Limit Protected | Multi-Tier Auth Fallback
 """
 
 import base64
@@ -11,17 +12,22 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.parse
+from typing import Optional
 import requests
 from huggingface_hub import HfApi
 
-CF_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
-CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
+CLASSIC_API_TOKEN = os.getenv("CLASSIC_API_TOKEN", "").strip().lstrip("\\")
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
+HF_AUTH_TOKEN = CLASSIC_API_TOKEN if CLASSIC_API_TOKEN else HF_TOKEN
+
+CLOUDFLARE_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
+
 MASTER_INDEX_PATH = "cdn/master-index.json"
-
-MAX_IMAGES_PER_PULSE = 12
-
+CF_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
+MAX_IMAGES_PER_PULSE = 10
 
 def check_cover_exists_on_hf(repo_id: str, filename: str) -> bool:
     url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
@@ -31,7 +37,6 @@ def check_cover_exists_on_hf(repo_id: str, filename: str) -> bool:
     except Exception:
         return False
 
-
 def build_sacred_geometry_prompt(item: dict) -> str:
     dao_idx = item.get("dao_index", 1)
     title = item.get("title", "EATHESEN Mathematical Architecture")
@@ -39,23 +44,20 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     return (
         f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}: {title}. "
         f"Luminous golden light rays, ruby core crystal matrix, mathematical tensor lattice ({nodes}), "
-        f"ethereal cosmic harmony, minimalist SOTA scientific illustration, 8k resolution, sharp focus, no text."
+        f"ethereal cosmic harmony, minimalist SOTA scientific illustration, 8k resolution, sharp focus, "
+        f"highly detailed, symmetrical, divine light, no text, no watermark, no humans."
     )
 
-
-def render_via_cloudflare(prompt: str) -> bytes | None:
-    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
+def render_via_cloudflare(prompt: str) -> Optional[bytes]:
+    if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
         print("[WARN] Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN. Skipping Cloudflare tier.")
         return None
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/black-forest-labs/flux-1-schnell"
-    headers = {
-        "Authorization": f"Bearer {CF_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "prompt": prompt,
-    }
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{CF_IMAGE_MODEL}"
+    print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
+    
+    headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
+    payload = {"prompt": prompt, "seed": 24}
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=60)
@@ -69,15 +71,18 @@ def render_via_cloudflare(prompt: str) -> bytes | None:
             if b64_img:
                 print("[CLOUDFLARE AI] FLUX.1-schnell base64 render succeeded.")
                 return base64.b64decode(b64_img)
-        print(f"[WARN] Cloudflare Workers AI returned HTTP {resp.status_code}: {resp.text[:200]}")
+        elif resp.status_code == 429:
+            print("[WARN] Cloudflare AI Rate Limit hit (HTTP 429). Switching to fallback.")
+        else:
+            print(f"[WARN] Cloudflare Workers AI returned HTTP {resp.status_code}: {resp.text[:200]}")
     except Exception as exc:
         print(f"[WARN] Cloudflare Workers AI connection error: {exc}")
     return None
 
-
-def render_via_pollinations_fallback(prompt: str) -> bytes | None:
+def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true"
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
+    print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
         resp = requests.get(url, timeout=60)
         if resp.status_code == 200 and len(resp.content) > 5000:
@@ -88,13 +93,12 @@ def render_via_pollinations_fallback(prompt: str) -> bytes | None:
         print(f"[WARN] Pollinations connection error: {exc}")
     return None
 
-
 def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
-    if not HF_TOKEN:
-        raise RuntimeError("CRITICAL: Missing HF_TOKEN for Hugging Face upload.")
+    if not HF_AUTH_TOKEN:
+        raise RuntimeError("CRITICAL: Missing CLASSIC_API_TOKEN / HF_TOKEN for Hugging Face upload.")
 
     try:
-        api = HfApi(token=HF_TOKEN)
+        api = HfApi(token=HF_AUTH_TOKEN)
         api.upload_file(
             path_or_fileobj=image_bytes,
             path_in_repo=filename,
@@ -108,7 +112,6 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
         print(f"[ERROR] Failed uploading cover to {repo_id} via HfApi: {exc}")
         return False
 
-
 def main() -> int:
     if not os.path.exists(MASTER_INDEX_PATH):
         print("[INFO] cdn/master-index.json not found. Skipping visual cycle.")
@@ -117,13 +120,13 @@ def main() -> int:
     with open(MASTER_INDEX_PATH, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    datasets = master.get("datasets", [])
-    print(f"=== [EATHESEN VISUAL RENDERER] Checking {len(datasets)} repositories in master-index.json ===")
+    datasets = master.get("recent_datasets", [])
+    print(f"=== [EATHESEN VISUAL RENDERER] Checking {len(datasets)} recent repositories in master-index.json ===")
 
     rendered_count = 0
     for item in datasets:
         if rendered_count >= MAX_IMAGES_PER_PULSE:
-            print(f"[LIMIT] Reached cap of {MAX_IMAGES_PER_PULSE} images/pulse to preserve daily Neurons.")
+            print(f"[LIMIT] Reached cap of {MAX_IMAGES_PER_PULSE} images/pulse.")
             break
 
         repo_id = item["repo_id"]
@@ -136,14 +139,18 @@ def main() -> int:
 
         print(f"[RENDERING] Generating artwork for {repo_id} -> {filename}...")
         prompt = build_sacred_geometry_prompt(item)
-        img_bytes = render_via_cloudflare(prompt) or render_via_pollinations_fallback(prompt)
+        
+        img_bytes = render_via_cloudflare(prompt)
+        if not img_bytes:
+            time.sleep(2)
+            img_bytes = render_via_pollinations_fallback(prompt)
 
         if img_bytes and upload_image_to_hf(repo_id, filename, img_bytes):
             rendered_count += 1
+            time.sleep(3)
 
     print(f"[COMPLETE] Visual render cycle finished. New covers published: {rendered_count}.")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
