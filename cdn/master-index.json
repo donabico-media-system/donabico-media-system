@@ -2,11 +2,11 @@
   "system": "EATHESEN V3000 SOTA — Master Global Index (Sharded)",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "updated_at": "2026-11-13T17:26:14Z",
+  "updated_at": "2026-11-13T17:47:48Z",
   "total_repositories": 2,
   "total_shards": 1,
   "shard_endpoints": {
-    "shard_001": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index-part-001.json"
+    "shard_0001": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index-part-0001.json"
   },
   "recent_datasets": [
     {
@@ -38,7 +38,7 @@
       ],
       "hf_url": "https://huggingface.co/datasets/donabico/path-00002",
       "parquet_verified": true,
-      "audited_at": "2026-11-13T14:17:25Z"
+      "audited_at": "2026-11-13T17:47:16Z"
     }
   ]
 }
