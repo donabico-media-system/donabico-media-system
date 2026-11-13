@@ -4,8 +4,27 @@
   "hf_hub": "donabico",
   "anchor": "¢24",
   "parity": "EVEN",
-  "updated_at": "2026-11-13T09:41:53Z",
-  "total_verified": 0,
-  "edge_distilled_synthesis": "No new datasets in rolling window; existing CDN state verified under ¢24 invariant.",
-  "datasets": []
+  "updated_at": "2026-11-13T09:47:57Z",
+  "total_verified": 1,
+  "edge_distilled_synthesis": "All authorized Cloudflare Edge AI text endpoints temporarily busy; deterministic metadata preserved.",
+  "datasets": [
+    {
+      "repo_id": "donabico/path-00002",
+      "sequence": 2,
+      "dao_index": 2,
+      "anchor": "¢24",
+      "title": "Structural Isomorphism Between Christian Agape, Buddhist Karuna, and Deterministic AI Alignment",
+      "shannon_entropy": 4.7602,
+      "tensor_variance": 2.028e-05,
+      "pure_logic_nodes": [
+        "NODE_LOGOS_AGAPE",
+        "NODE_PRAJNA_KARUNA",
+        "NODE_SUNYATA_FILTER",
+        "NODE_C24_INVARIANT"
+      ],
+      "hf_url": "https://huggingface.co/datasets/donabico/path-00002",
+      "parquet_verified": true,
+      "audited_at": "2026-11-13T09:47:56Z"
+    }
+  ]
 }
