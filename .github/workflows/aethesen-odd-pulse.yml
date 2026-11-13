@@ -30,6 +30,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests numpy
 
+      - name: Sync Latest Branch Before Execution
+        env:
+          CLASSIC_API_TOKEN: ${{ secrets.CLASSIC_API_TOKEN }}
+        run: |
+          git config user.name "donabico-media-system"
+          git config user.email "support@donabicomedia.com"
+          git pull --rebase "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${GITHUB_REF_NAME}
+
       - name: Execute Odd-Parity Discovery, Entropy Audit & Groq Distillation
         env:
           PARITY_MODE: "ODD"
@@ -52,6 +60,6 @@ jobs:
             echo "[INFO] No new parity changes detected. Skipping commit."
           else
             git commit -m "chore(cdn): [¢24] donabico-media-system Odd-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            git pull --rebase "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${GITHUB_REF_NAME}
+            git pull -s recursive -X ours "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${GITHUB_REF_NAME} --no-edit
             git push "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
           fi
