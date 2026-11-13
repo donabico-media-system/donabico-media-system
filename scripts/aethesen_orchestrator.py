@@ -4,7 +4,7 @@ AETHESEN V3000 SOTA - Autonomous Parity Orchestrator & CDN Broadcaster
 GitHub Owner: donabico-media-system
 Hugging Face Owner: donabico
 Anchor Constant: ¢24
-Protocols: Dynamic HF Discovery -> Shannon Entropy Audit -> Groq LPU Distillation -> CDN Feed Export
+Protocols: Dynamic HF Discovery -> Shannon Entropy Audit -> Groq LPU Authorized Model Distillation -> CDN Feed Export
 """
 
 import json
@@ -27,6 +27,13 @@ CDN_DIR = "cdn"
 D_MODEL = 49152
 ENTROPY_LIMIT = 5.0
 ANCHOR_CONSTANT = "¢24"
+
+# Authorized Organization Models on GroqCloud (Donabico Media System)
+AUTHORIZED_GROQ_MODELS = [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+]
 
 
 def compute_shannon_entropy(text: str) -> float:
@@ -137,9 +144,14 @@ def fetch_and_audit_dataset(repo_id: str) -> dict | None:
 
 
 def distill_with_groq(audited_items: list[dict], parity: str) -> str:
-    """Sends audited knowledge to Groq LPU for zero-hallucination synthesis."""
+    """Sends audited knowledge to Groq LPU using the organization's allowed models with fallback."""
     if not GROQ_API_KEY:
         raise RuntimeError("CRITICAL: GROQ_API_KEY is missing from environment secrets.")
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     corpus_digest = "\n\n---\n\n".join(
         f"REPO: {item['repo_id']} | DAO: {item['dao_name']}\n"
@@ -166,25 +178,31 @@ def distill_with_groq(audited_items: list[dict], parity: str) -> str:
         "and machine-readable takeaways."
     )
 
-    resp = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.0,
-            "max_tokens": 1500,
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    last_error = None
+    for model_id in AUTHORIZED_GROQ_MODELS:
+        print(f"[GROQ LPU] Attempting distillation with authorized model: {model_id}")
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": model_id,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 1500,
+            },
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            print(f"[GROQ LPU] Distillation succeeded via {model_id}.")
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+        last_error = f"{model_id} -> HTTP {resp.status_code}: {resp.text}"
+        print(f"[WARN] {last_error}. Trying next allowed model...")
+
+    raise RuntimeError(f"All authorized Groq models failed. Last error: {last_error}")
 
 
 def write_cdn_artifacts(audited_items: list[dict], synthesis: str, parity: str) -> None:
