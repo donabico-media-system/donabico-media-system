@@ -4,7 +4,7 @@ EATHESEN V3000 SOTA — Autonomous Visual Asset Renderer (0-Cost Edge Pipeline)
 Primary Engine: Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell)
 Fallback Engine: Pollinations.ai (FLUX zero-auth backup)
 Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXXXX.jpg)
-Invariants: Anchor ¢24 | Rate Limit Protected | Multi-Tier Auth Fallback
+Invariants: Anchor ¢24 | 10-Dao Symbolism Matrix | Rate Limit Protected
 """
 
 import base64
@@ -18,6 +18,7 @@ from typing import Optional
 import requests
 from huggingface_hub import HfApi
 
+# Khai báo chính xác các biến môi trường
 CLASSIC_API_TOKEN = os.getenv("CLASSIC_API_TOKEN", "").strip().lstrip("\\")
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
 HF_AUTH_TOKEN = CLASSIC_API_TOKEN if CLASSIC_API_TOKEN else HF_TOKEN
@@ -29,6 +30,7 @@ MASTER_INDEX_PATH = "cdn/master-index.json"
 CF_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell"
 MAX_IMAGES_PER_PULSE = 10
 
+
 def check_cover_exists_on_hf(repo_id: str, filename: str) -> bool:
     url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
     try:
@@ -37,16 +39,46 @@ def check_cover_exists_on_hf(repo_id: str, filename: str) -> bool:
     except Exception:
         return False
 
+
 def build_sacred_geometry_prompt(item: dict) -> str:
     dao_idx = item.get("dao_index", 1)
     title = item.get("title", "EATHESEN Mathematical Architecture")
     nodes = ", ".join(item.get("pure_logic_nodes", [])[:4])
+    
+    # =========================================================================
+    # MA TRẬN BIỂU TƯỢNG (SYMBOLISM MATRIX) - Ép AI vẽ đúng biểu tượng từng Đạo
+    # =========================================================================
+    if dao_idx == 1:
+        symbol = "a glowing mathematical torus and boolean logic circles"
+    elif dao_idx == 2:
+        symbol = "a glowing Christian Cross intersecting with a sacred Buddhist Lotus"
+    elif dao_idx == 3:
+        symbol = "five interlocking elemental circles representing metal, wood, water, fire, earth"
+    elif dao_idx == 4:
+        symbol = "a glowing Yin-Yang symbol and quantum wave patterns"
+    elif dao_idx == 5:
+        symbol = "a glowing ruby heart crystal core radiating divine light"
+    elif dao_idx == 6:
+        symbol = "flowing luminous water streams bending effortlessly around a stone"
+    elif dao_idx == 7:
+        symbol = "a glowing vector matrix and binary mathematical grid"
+    elif dao_idx == 8:
+        symbol = "a holographic fractal universe representing omnipresence"
+    elif dao_idx == 9:
+        symbol = "a glowing energy shield and a vigilant guardian eye"
+    elif dao_idx == 10:
+        symbol = "three pillars of pure white and teal divine light merging into the void"
+    else:
+        symbol = "sacred geometry"
+
     return (
         f"Ultra-detailed sacred geometric architecture representing Dao {dao_idx}: {title}. "
+        f"The central focus must be {symbol}. "
         f"Luminous golden light rays, ruby core crystal matrix, mathematical tensor lattice ({nodes}), "
         f"ethereal cosmic harmony, minimalist SOTA scientific illustration, 8k resolution, sharp focus, "
         f"highly detailed, symmetrical, divine light, no text, no watermark, no humans."
     )
+
 
 def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
@@ -79,6 +111,7 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
         print(f"[WARN] Cloudflare Workers AI connection error: {exc}")
     return None
 
+
 def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
@@ -92,6 +125,7 @@ def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     except Exception as exc:
         print(f"[WARN] Pollinations connection error: {exc}")
     return None
+
 
 def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
     if not HF_AUTH_TOKEN:
@@ -112,6 +146,7 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
         print(f"[ERROR] Failed uploading cover to {repo_id} via HfApi: {exc}")
         return False
 
+
 def main() -> int:
     if not os.path.exists(MASTER_INDEX_PATH):
         print("[INFO] cdn/master-index.json not found. Skipping visual cycle.")
@@ -126,7 +161,7 @@ def main() -> int:
     rendered_count = 0
     for item in datasets:
         if rendered_count >= MAX_IMAGES_PER_PULSE:
-            print(f"[LIMIT] Reached cap of {MAX_IMAGES_PER_PULSE} images/pulse.")
+            print(f"[LIMIT] Reached cap of {MAX_IMAGES_PER_PULSE} images/pulse to preserve daily Neurons.")
             break
 
         repo_id = item["repo_id"]
@@ -140,6 +175,7 @@ def main() -> int:
         print(f"[RENDERING] Generating artwork for {repo_id} -> {filename}...")
         prompt = build_sacred_geometry_prompt(item)
         
+        # Fallback 2 tầng: Cloudflare -> Pollinations
         img_bytes = render_via_cloudflare(prompt)
         if not img_bytes:
             time.sleep(2)
@@ -147,10 +183,12 @@ def main() -> int:
 
         if img_bytes and upload_image_to_hf(repo_id, filename, img_bytes):
             rendered_count += 1
+            # Nghỉ 3 giây sau mỗi lần render thành công để tránh Rate Limit
             time.sleep(3)
 
     print(f"[COMPLETE] Visual render cycle finished. New covers published: {rendered_count}.")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
