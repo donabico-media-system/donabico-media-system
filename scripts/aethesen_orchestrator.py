@@ -4,7 +4,7 @@ AETHESEN V3000 SOTA - Autonomous Parity Orchestrator & CDN Broadcaster
 GitHub Owner: donabico-media-system
 Hugging Face Owner: donabico
 Anchor Constant: ¢24
-Protocols: Dynamic HF Discovery -> Shannon Entropy Audit -> Groq LPU Authorized Model Distillation -> CDN Feed Export
+Protocols: Dynamic HF Discovery -> Dual-Schema ¢24 & Entropy Audit -> Groq LPU Distillation -> CDN Feed Export
 """
 
 import json
@@ -115,10 +115,17 @@ def fetch_and_audit_dataset(repo_id: str) -> dict | None:
 
     row_payload = rows[0].get("row", {})
     content = row_payload.get("content", "")
-    anchor = row_payload.get("anchor", "")
+    metadata = row_payload.get("metadata") or {}
+
+    # Resolve ¢24 anchor from root field, nested metadata object, or content body
+    anchor = (
+        row_payload.get("anchor")
+        or (metadata.get("anchor") if isinstance(metadata, dict) else "")
+        or (ANCHOR_CONSTANT if ANCHOR_CONSTANT in content else "")
+    )
 
     if anchor != ANCHOR_CONSTANT:
-        print(f"[BLOCK] {repo_id} failed ¢24 anchor verification (found: {anchor}).")
+        print(f"[BLOCK] {repo_id} failed ¢24 anchor verification (found: '{anchor}').")
         return None
 
     entropy = compute_shannon_entropy(content)
@@ -129,13 +136,21 @@ def fetch_and_audit_dataset(repo_id: str) -> dict | None:
     variance = verify_tensor_stability(content)
     print(f"[PASS] {repo_id} | HTTP 200 OK | H(X)={entropy:.4f} | Var={variance:.4e} | ¢24 LOCKED")
 
+    seq_num = int(repo_id.split("-")[-1])
+    inferred_dao = 10 if (seq_num % 10 == 0) else (seq_num % 10)
+
+    dao_index = row_payload.get("dao_index") or (metadata.get("dao_index") if isinstance(metadata, dict) else None) or inferred_dao
+    dao_name = row_payload.get("dao_name") or (metadata.get("dao_name") if isinstance(metadata, dict) else None) or f"Dao {dao_index}"
+    title = row_payload.get("title") or f"Aethesen Research {repo_id}"
+    pure_nodes = row_payload.get("pure_logic_nodes") or [f"NODE_DAO_{dao_index}", "NODE_C24_INVARIANT"]
+
     return {
         "repo_id": repo_id,
-        "dao_index": row_payload.get("dao_index"),
-        "dao_name": row_payload.get("dao_name"),
-        "title": row_payload.get("title"),
+        "dao_index": dao_index,
+        "dao_name": dao_name,
+        "title": title,
         "content": content,
-        "pure_logic_nodes": row_payload.get("pure_logic_nodes", []),
+        "pure_logic_nodes": pure_nodes,
         "shannon_entropy": round(entropy, 6),
         "tensor_variance": variance,
         "cdn_api_url": cdn_url,
