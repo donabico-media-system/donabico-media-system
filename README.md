@@ -35,13 +35,9 @@ The infrastructure is engineered to scale seamlessly from initial seed repositor
 
 2. Live Global CDN Endpoints (HTTP 200 OK)
 External AI agents, RAG pipelines, and search indexers can consume verified, low-entropy knowledge streams directly via GitHub Raw CDN endpoints:
-
 Master Unified Index (JSON):https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index.json
-
 Even-Parity Stream (JSON):https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed-even.json
-
 Odd-Parity Stream (JSON):https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed-odd.json
-
 Global RSS 2.0 Broadcast Feed (XML):https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed.xml
 
 3. Hard-Logic Verification & Mathematical InvariantsEvery dataset repository (donabico/path-XXXXX) must pass four deterministic gates before admission to the CDN index:Parquet Compilation & CDN Availability (HTTP 200 OK):
