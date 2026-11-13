@@ -2,6 +2,7 @@
 """
 EATHESEN V3000 SOTA — 10,000-Scale Autonomous Knowledge Orchestrator & CDN Broadcaster
 GitHub Hub: donabico-media-system | Hugging Face Org: donabico
+Distillation Engine: Cloudflare Workers AI Edge Cluster (Zero-Cost Unified Pipeline)
 Invariants: Anchor ¢24 | Shannon Entropy H(X) < 5.5 | L2 Tensor Norm Stability (d=49,152)
 """
 
@@ -24,19 +25,20 @@ GITHUB_OWNER = "donabico-media-system"
 GITHUB_REPO = "donabico-media-system"
 
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+CF_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
 
 ENTROPY_LIMIT = 5.5
 TENSOR_DIM = 49152
 MAX_WORKERS = 10
 SENTINEL_SAMPLE_SIZE = 15
-GROQ_WINDOW_SIZE = 10
+DISTILL_WINDOW_SIZE = 10
 EXCERPT_CHAR_LIMIT = 1200
 
-AUTHORIZED_GROQ_MODELS = [
-    "openai/gpt-oss-120b",
-    "qwen/qwen3.8-27b",
-    "openai/gpt-oss-20b",
+AUTHORIZED_CF_TEXT_MODELS = [
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/qwen/qwen2.5-72b-instruct",
+    "@cf/meta/llama-3.1-8b-instruct-fast",
 ]
 
 CDN_DIR = "cdn"
@@ -110,7 +112,7 @@ def discover_parity_repositories(parity: str) -> List[str]:
     matched: List[str] = []
     for item in items:
         repo_id = item.get("id", "")
-        m = re.match(rf"^{re.escape(HF_ORG)}/path-(\d{{5}})$", repo_id)
+        m = re.match(rf"^{re.escape(HF_ORG)}/path-(\d{{5}})\$", repo_id)
         if not m:
             continue
         seq = int(m.group(1))
@@ -219,14 +221,14 @@ def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def distill_with_groq_lpu(batch: List[Dict[str, Any]], parity: str) -> str:
+def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     if not batch:
         return "No new datasets in rolling window; existing CDN state verified under ¢24 invariant."
-    if not GROQ_API_KEY:
-        return "GROQ_API_KEY not configured; deterministic metadata broadcast active."
+    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
+        return "Cloudflare credentials not configured; deterministic metadata broadcast active."
 
     corpus_lines = []
-    for item in batch[:GROQ_WINDOW_SIZE]:
+    for item in batch[:DISTILL_WINDOW_SIZE]:
         corpus_lines.append(
             f"- Repo: {item['repo_id']} (Dao {item['dao_index']}, H(X)={item['shannon_entropy']}): "
             f"{item['title']} | Excerpt: {item.get('_excerpt', '')}"
@@ -246,37 +248,38 @@ def distill_with_groq_lpu(batch: List[Dict[str, Any]], parity: str) -> str:
     )
 
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {CF_API_TOKEN}",
         "Content-Type": "application/json",
     }
 
-    for model_name in AUTHORIZED_GROQ_MODELS:
-        print(f"[GROQ LPU] Attempting rolling-window distillation ({len(batch)} items) via: {model_name}")
+    for model_name in AUTHORIZED_CF_TEXT_MODELS:
+        print(f"[CLOUDFLARE AI] Attempting rolling-window distillation ({len(batch)} items) via: {model_name}")
+        url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{model_name}"
         payload = {
-            "model": model_name,
             "temperature": 0.0,
-            "max_tokens": 1200,
+            "max_tokens": 1024,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         }
         try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=35,
-            )
+            resp = requests.post(url, headers=headers, json=payload, timeout=45)
             if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"].strip()
-                print(f"[GROQ LPU] Distillation succeeded via {model_name}.")
-                return content
-            print(f"[GROQ LPU] Model {model_name} returned HTTP {resp.status_code}; failing over...")
+                data = resp.json()
+                result_obj = data.get("result", {})
+                content = (
+                    result_obj.get("response")
+                    or result_obj.get("choices", [{}])[0].get("message", {}).get("content", "")
+                ).strip()
+                if content:
+                    print(f"[CLOUDFLARE AI] Distillation succeeded via {model_name}.")
+                    return content
+            print(f"[CLOUDFLARE AI] Model {model_name} returned HTTP {resp.status_code}: {resp.text[:160]}; failing over...")
         except Exception as exc:
-            print(f"[GROQ LPU] Exception on {model_name}: {exc}; failing over...")
+            print(f"[CLOUDFLARE AI] Exception on {model_name}: {exc}; failing over...")
 
-    return "All authorized Groq LPU endpoints temporarily saturated; deterministic metadata preserved."
+    return "All authorized Cloudflare Edge AI text endpoints temporarily busy; deterministic metadata preserved."
 
 
 def write_cdn_artifacts(
@@ -302,7 +305,7 @@ def write_cdn_artifacts(
         "parity": parity,
         "updated_at": now_iso,
         "total_verified": len(clean_datasets),
-        "groq_distilled_synthesis": distilled_synthesis,
+        "edge_distilled_synthesis": distilled_synthesis,
         "datasets": clean_datasets,
     }
     with open(parity_file, "w", encoding="utf-8") as f:
@@ -414,12 +417,12 @@ def main() -> int:
     if not priority_batch and freshly_audited:
         priority_batch = list(freshly_audited.values())
 
-    distilled_text = distill_with_groq_lpu(priority_batch[:GROQ_WINDOW_SIZE], parity)
+    distilled_text = distill_with_cloudflare_ai(priority_batch[:DISTILL_WINDOW_SIZE], parity)
     write_cdn_artifacts(parity, final_list, distilled_text)
 
     print(
         f"[SUCCESS] 10K-Scale Broadcast complete for {GITHUB_OWNER}. "
-        f"Total {parity} live: {len(final_list)} | Distilled batch: {len(priority_batch[:GROQ_WINDOW_SIZE])}."
+        f"Total {parity} live: {len(final_list)} | Distilled batch: {len(priority_batch[:DISTILL_WINDOW_SIZE])}."
     )
     return 0
 
