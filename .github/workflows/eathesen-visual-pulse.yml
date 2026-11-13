@@ -32,7 +32,6 @@ jobs:
       - name: Execute Autonomous Visual Renderer
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          CLASSIC_API_TOKEN: ${{ secrets.CLASSIC_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/eathesen_image_renderer.py
@@ -41,13 +40,11 @@ jobs:
         run: |
           git config user.name "donabico-media-system"
           git config user.email "support@donabicomedia.com"
-          # Thêm cả thư mục cdn và assets (nếu có)
           git add cdn/ assets/ 2>/dev/null || git add cdn/
           if git diff --staged --quiet; then
             echo "No visual assets to publish."
           else
             git commit -m "chore(visual): [¢24] render pulse $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            # Kéo code mới nhất và tự động ưu tiên code vừa chạy (-X ours)
             git pull origin main --no-rebase -X ours
             git push origin main
           fi
