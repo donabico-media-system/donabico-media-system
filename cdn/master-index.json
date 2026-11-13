@@ -2,7 +2,7 @@
   "system": "EATHESEN V3000 SOTA — Master Global Index",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "updated_at": "2026-11-13T09:49:41Z",
+  "updated_at": "2026-11-13T09:51:26Z",
   "total_repositories": 2,
   "cdn_endpoints": {
     "master_index": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index.json",
@@ -40,7 +40,7 @@
       ],
       "hf_url": "https://huggingface.co/datasets/donabico/path-00002",
       "parquet_verified": true,
-      "audited_at": "2026-11-13T09:49:41Z"
+      "audited_at": "2026-11-13T09:51:26Z"
     }
   ]
 }

@@ -4,7 +4,7 @@
   "hf_hub": "donabico",
   "anchor": "¢24",
   "parity": "EVEN",
-  "updated_at": "2026-11-13T09:49:41Z",
+  "updated_at": "2026-11-13T09:51:26Z",
   "total_verified": 1,
   "edge_distilled_synthesis": "All authorized Cloudflare Edge AI text endpoints temporarily busy; deterministic metadata preserved.",
   "datasets": [
@@ -24,7 +24,7 @@
       ],
       "hf_url": "https://huggingface.co/datasets/donabico/path-00002",
       "parquet_verified": true,
-      "audited_at": "2026-11-13T09:49:41Z"
+      "audited_at": "2026-11-13T09:51:26Z"
     }
   ]
 }
