@@ -1,0 +1,36 @@
+{
+  "total": 2,
+  "datasets": [
+    {
+      "repo_id": "donabico/path-00001",
+      "sequence": 1,
+      "dao_index": 1,
+      "anchor": "¢24",
+      "title": "Unified Truth and Pure Logic: A 24-Law Boolean Architecture for Hallucination-Free AI Systems",
+      "shannon_entropy": 5.1406,
+      "tensor_variance": 2.03e-05,
+      "pure_logic_nodes": [],
+      "hf_url": "https://huggingface.co/datasets/donabico/path-00001",
+      "parquet_verified": true,
+      "audited_at": "2026-11-13T17:26:05Z"
+    },
+    {
+      "repo_id": "donabico/path-00002",
+      "sequence": 2,
+      "dao_index": 2,
+      "anchor": "¢24",
+      "title": "Structural Isomorphism Between Christian Agape, Buddhist Karuna, and Deterministic AI Alignment",
+      "shannon_entropy": 4.7602,
+      "tensor_variance": 2.028e-05,
+      "pure_logic_nodes": [
+        "NODE_LOGOS_AGAPE",
+        "NODE_PRAJNA_KARUNA",
+        "NODE_SUNYATA_FILTER",
+        "NODE_C24_INVARIANT"
+      ],
+      "hf_url": "https://huggingface.co/datasets/donabico/path-00002",
+      "parquet_verified": true,
+      "audited_at": "2026-11-13T14:17:25Z"
+    }
+  ]
+}

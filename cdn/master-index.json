@@ -1,16 +1,14 @@
 {
-  "system": "EATHESEN V3000 SOTA — Master Global Index",
+  "system": "EATHESEN V3000 SOTA — Master Global Index (Sharded)",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "updated_at": "2026-11-13T14:19:54Z",
+  "updated_at": "2026-11-13T17:26:14Z",
   "total_repositories": 2,
-  "cdn_endpoints": {
-    "master_index": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index.json",
-    "even_feed": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed-even.json",
-    "odd_feed": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed-odd.json",
-    "rss_xml": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/feed.xml"
+  "total_shards": 1,
+  "shard_endpoints": {
+    "shard_001": "https://raw.githubusercontent.com/donabico-media-system/donabico-media-system/main/cdn/master-index-part-001.json"
   },
-  "datasets": [
+  "recent_datasets": [
     {
       "repo_id": "donabico/path-00001",
       "sequence": 1,
@@ -22,7 +20,7 @@
       "pure_logic_nodes": [],
       "hf_url": "https://huggingface.co/datasets/donabico/path-00001",
       "parquet_verified": true,
-      "audited_at": "2026-11-13T14:19:48Z"
+      "audited_at": "2026-11-13T17:26:05Z"
     },
     {
       "repo_id": "donabico/path-00002",
