@@ -65,5 +65,5 @@ academic-article-XXXXX.math.py — Standalone mathematical verification script f
 GitHub Organization: donabico-media-system
 Hugging Face Dataset Hub: donabico
 Operating Entity: Donabico Media System
-Official Contact: support@donabicomedia.com
+Official Contact: donabico.media.system@gmail.com
 
