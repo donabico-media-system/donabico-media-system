@@ -92,37 +92,25 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
     if not HF_TOKEN:
         raise RuntimeError("CRITICAL: Missing HF_TOKEN for Hugging Face upload.")
 
-    api_url = f"https://huggingface.co/api/datasets/{repo_id}/commit/main"
+    api_url = f"https://huggingface.co/api/datasets/{repo_id}/upload/main/{filename}"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/x-ndjson",
+    }
+    files = {
+        "file": (filename, image_bytes, "image/jpeg")
+    }
+    data = {
+        "commit_message": f"feat(visual): [¢24] Add deterministic cover artwork {filename}"
     }
 
-    b64_content = base64.b64encode(image_bytes).decode("ascii")
-    ndjson_lines = [
-        json.dumps({
-            "key": "header",
-            "value": {
-                "summary": f"feat(visual): [¢24] Add deterministic cover artwork {filename}",
-                "description": "Rendered autonomously via EATHESEN Visual Engine (Cloudflare Workers AI).",
-            },
-        }),
-        json.dumps({
-            "key": "file",
-            "value": {
-                "content": b64_content,
-                "path": filename,
-                "encoding": "base64",
-            },
-        }),
-    ]
-    payload = "\n".join(ndjson_lines) + "\n"
-
-    resp = requests.post(api_url, headers=headers, data=payload.encode("utf-8"), timeout=45)
-    if resp.status_code in (200, 201):
-        print(f"[HF UPLOAD] Successfully published {repo_id}/{filename}")
-        return True
-    print(f"[ERROR] Failed uploading cover to {repo_id}: HTTP {resp.status_code} - {resp.text[:200]}")
+    try:
+        resp = requests.post(api_url, headers=headers, files=files, data=data, timeout=60)
+        if resp.status_code in (200, 201):
+            print(f"[HF UPLOAD] Successfully published binary asset {repo_id}/{filename}")
+            return True
+        print(f"[ERROR] Failed uploading cover to {repo_id}: HTTP {resp.status_code} - {resp.text[:200]}")
+    except Exception as exc:
+        print(f"[ERROR] Exception during binary upload to {repo_id}: {exc}")
     return False
 
 
