@@ -23,9 +23,9 @@ HF_ORG = "donabico"
 GITHUB_OWNER = "donabico-media-system"
 GITHUB_REPO = "donabico-media-system"
 
-HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
-CF_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
+CF_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
+CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
 
 MAX_SCALE_LIMIT = 10000
 CONSECUTIVE_MISS_STOP = 3
@@ -118,7 +118,6 @@ def load_cached_parity_datasets(parity: str) -> Dict[str, Dict[str, Any]]:
 
 
 def repository_exists(repo_id: str) -> bool:
-    """Kiểm tra trực tiếp kho dataset có tồn tại trên Hugging Face Hub hay không."""
     headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     url = f"https://huggingface.co/api/datasets/{repo_id}"
     try:
@@ -209,11 +208,6 @@ def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
 
 
 def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Quét tuần tự từng Dataset theo đúng thứ tự toán học:
-    - EVEN: path-00002, path-00004, path-00006, ...
-    - ODD:  path-00001, path-00003, path-00005, ...
-    """
     start_seq = 2 if parity == "EVEN" else 1
     max_cached_seq = max((d["sequence"] for d in cached_map.values()), default=0)
 
