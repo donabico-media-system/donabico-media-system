@@ -52,5 +52,6 @@ jobs:
             echo "[INFO] No new parity changes detected. Skipping commit."
           else
             git commit -m "chore(cdn): [¢24] donabico-media-system Even-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git pull --rebase "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${GITHUB_REF_NAME}
             git push "https://x-access-token:${CLASSIC_API_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
           fi
