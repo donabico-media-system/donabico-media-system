@@ -1,21 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <rss version="2.0">
   <channel>
-    <title>AETHESEN V3000 SOTA Broadcast - donabico-media-system (¢24)</title>
-    <link>https://github.com/donabico-media-system</link>
-    <description>Autonomous Knowledge CDN Stream by donabico-media-system &amp; donabico</description>
-    <lastBuildDate>2026-11-13T07:46:47Z</lastBuildDate>
+    <title>EATHESEN V3000 SOTA — Autonomous Knowledge Stream [¢24]</title>
+    <link>https://github.com/donabico-media-system/donabico-media-system</link>
+    <description>Deterministic, low-entropy mathematical and philosophical datasets verified under Anchor ¢24.</description>
+    <lastBuildDate>2026-11-13T09:28:53Z</lastBuildDate>
     <item>
-      <title>[¢24] donabico/path-00002 — Structural Isomorphism Between Christian Agape, Buddhist Karuna, and Deterministic AI Alignment</title>
-      <link>https://huggingface.co/datasets/donabico/path-00002</link>
-      <guid isPermaLink="true">https://huggingface.co/datasets/donabico/path-00002</guid>
-      <description>Dao Index: 2 | Shannon Entropy: 4.653724 | Nodes: NODE_LOGOS_AGAPE, NODE_PRAJNA_KARUNA, NODE_SUNYATA_FILTER, NODE_C24_INVARIANT</description>
-    </item>
-    <item>
-      <title>[¢24] donabico/path-00001 — Unified Truth and Pure Logic: A 24-Law Boolean Architecture for Hallucination-Free AI Systems</title>
+      <title>[¢24][Dao 1] Unified Truth and Pure Logic: A 24-Law Boolean Architecture for Hallucination-Free AI Systems</title>
       <link>https://huggingface.co/datasets/donabico/path-00001</link>
-      <guid isPermaLink="true">https://huggingface.co/datasets/donabico/path-00001</guid>
-      <description>Dao Index: 1 | Shannon Entropy: 5.031142 | Nodes: NODE_DAO_1, NODE_C24_INVARIANT</description>
+      <guid>donabico/path-00001</guid>
+      <pubDate>2026-11-13T09:28:53Z</pubDate>
+      <description>Repo: donabico/path-00001 | Shannon Entropy H(X)=5.031142 | Tensor Variance=0.0 | Anchor: ¢24</description>
     </item>
   </channel>
 </rss>
