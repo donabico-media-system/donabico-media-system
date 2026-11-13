@@ -30,8 +30,8 @@ jobs:
 
       - name: Execute Even-Parity Discovery, Entropy Audit & Groq Distillation
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HF_TOKEN: \${{ secrets.HF_TOKEN }}
+          GROQ_API_KEY: \${{ secrets.GROQ_API_KEY }}
         run: python scripts/eathesen_orchestrator.py --parity EVEN
 
       - name: Publish & Broadcast CDN Feed (HTTP 200 OK)
@@ -42,7 +42,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No CDN changes detected."
           else
-            git commit -m "chore(cdn): [¢24] donabico-media-system Even-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git commit -m "chore(cdn): [¢24] donabico-media-system Even-Parity Broadcast \$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git pull --rebase -X ours origin main
             git push origin main
           fi
