@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   odd-parity-orchestrator:
-    name: Odd-Parity Discovery, Entropy Audit & Cloudflare Edge Distillation
+    name: Odd-Parity Sequential Audit & Cloudflare Edge Distillation
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -28,11 +28,11 @@ jobs:
       - name: Install Dependencies
         run: pip install --quiet requests
 
-      - name: Execute Odd-Parity Discovery, Entropy Audit & Edge Distillation
+      - name: Execute Odd-Parity Sequential Audit & Edge Distillation
         env:
-          HF_TOKEN: \${{ secrets.HF_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/eathesen_orchestrator.py --parity ODD
 
       - name: Publish & Broadcast CDN Feed (HTTP 200 OK)
@@ -43,7 +43,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No CDN changes detected."
           else
-            git commit -m "chore(cdn): [¢24] donabico-media-system Odd-Parity Broadcast \$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git commit -m "chore(cdn): [¢24] donabico-media-system Odd-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git pull --rebase -X ours origin main
             git push origin main
           fi
