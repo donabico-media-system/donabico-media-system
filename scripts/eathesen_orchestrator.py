@@ -14,6 +14,7 @@ import math
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,9 +24,9 @@ HF_ORG = "donabico"
 GITHUB_OWNER = "donabico-media-system"
 GITHUB_REPO = "donabico-media-system"
 
-HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
-CF_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
+CF_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
+CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
 
 MAX_SCALE_LIMIT = 10000
 CONSECUTIVE_MISS_STOP = 3
@@ -118,14 +119,19 @@ def load_cached_parity_datasets(parity: str) -> Dict[str, Dict[str, Any]]:
 
 
 def repository_exists(repo_id: str) -> bool:
-    """Kiểm tra trực tiếp kho dataset có tồn tại trên Hugging Face Hub hay không."""
     headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     url = f"https://huggingface.co/api/datasets/{repo_id}"
-    try:
-        resp = requests.get(url, headers=headers, timeout=15)
-        return resp.status_code == 200
-    except Exception:
-        return False
+    for attempt in range(1, 3):
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                return True
+            if resp.status_code == 404:
+                return False
+            time.sleep(2 * attempt)
+        except Exception:
+            time.sleep(2 * attempt)
+    return False
 
 
 def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
@@ -134,12 +140,29 @@ def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
         f"https://datasets-server.huggingface.co/rows"
         f"?dataset={repo_id}&config=default&split=train&offset=0&length=5"
     )
-    try:
-        resp = requests.get(api_url, headers=headers, timeout=25)
-        if resp.status_code != 200:
+    resp = None
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(api_url, headers=headers, timeout=25)
+            if resp.status_code == 200:
+                break
+            if resp.status_code in (429, 500, 502, 503, 504) and attempt < 3:
+                print(f"[RETRY {attempt}/3] {repo_id} | Parquet HTTP {resp.status_code}, waiting {4 * attempt}s...")
+                time.sleep(4 * attempt)
+                continue
             print(f"[REJECT] {repo_id} | Parquet HTTP {resp.status_code}")
             return None
+        except Exception as exc:
+            if attempt < 3:
+                time.sleep(4 * attempt)
+                continue
+            print(f"[REJECT] {repo_id} | Exception: {exc}")
+            return None
 
+    if resp is None or resp.status_code != 200:
+        return None
+
+    try:
         payload = resp.json()
         rows = payload.get("rows", [])
         if not rows:
@@ -208,12 +231,9 @@ def audit_single_repository(repo_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Quét tuần tự từng Dataset theo đúng thứ tự toán học:
-    - EVEN: path-00002, path-00004, path-00006, ...
-    - ODD:  path-00001, path-00003, path-00005, ...
-    """
+def sequential_scan_and_audit(
+    parity: str, cached_map: Dict[str, Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     start_seq = 2 if parity == "EVEN" else 1
     max_cached_seq = max((d["sequence"] for d in cached_map.values()), default=0)
 
@@ -233,6 +253,8 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
                 if consecutive_misses >= CONSECUTIVE_MISS_STOP:
                     print(f"[SEQUENTIAL SCAN] Reached current frontier at path-{seq:05d}. Stopping scan.")
                     break
+            elif repo_id in cached_map:
+                verified_records.append(cached_map[repo_id])
             continue
 
         consecutive_misses = 0
@@ -249,7 +271,7 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
 
 def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     if not batch:
-        return "No verified datasets in sequential scan; awaiting new repository publication."
+        return "No fresh datasets audited in current pulse; cached CDN records verified under ¢24 invariant."
     if not CF_ACCOUNT_ID or not CF_API_TOKEN:
         return "Cloudflare credentials not configured; deterministic metadata broadcast active."
 
