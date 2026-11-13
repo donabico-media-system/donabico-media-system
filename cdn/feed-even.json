@@ -4,8 +4,8 @@
   "hf_hub": "donabico",
   "anchor": "¢24",
   "parity": "EVEN",
-  "updated_at": "2026-11-13T09:33:03Z",
+  "updated_at": "2026-11-13T09:41:53Z",
   "total_verified": 0,
-  "groq_distilled_synthesis": "No new datasets in rolling window; existing CDN state verified under ¢24 invariant.",
+  "edge_distilled_synthesis": "No new datasets in rolling window; existing CDN state verified under ¢24 invariant.",
   "datasets": []
 }
