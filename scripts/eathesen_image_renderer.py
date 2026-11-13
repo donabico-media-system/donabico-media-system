@@ -87,8 +87,6 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
     
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
-    
-    # ĐÃ VÁ: Xóa tham số "seed": 24 vì Cloudflare API không cho phép
     payload = {"prompt": prompt}
 
     try:
@@ -114,7 +112,6 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
 
 def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
-    # Pollinations vẫn hỗ trợ seed=24
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
     print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
@@ -134,6 +131,11 @@ def upload_image_to_hf(repo_id: str, filename: str, image_bytes: bytes) -> bool:
 
     try:
         api = HfApi(token=HF_AUTH_TOKEN)
+        
+        # NÂNG CẤP: Tự động tạo Repo nếu chưa tồn tại (tránh lỗi 401/404)
+        # exist_ok=True giúp bỏ qua nếu Repo đã có sẵn
+        api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
+        
         api.upload_file(
             path_or_fileobj=image_bytes,
             path_in_repo=filename,
@@ -176,7 +178,6 @@ def main() -> int:
         print(f"[RENDERING] Generating artwork for {repo_id} -> {filename}...")
         prompt = build_sacred_geometry_prompt(item)
         
-        # Fallback 2 tầng: Cloudflare -> Pollinations
         img_bytes = render_via_cloudflare(prompt)
         if not img_bytes:
             time.sleep(2)
