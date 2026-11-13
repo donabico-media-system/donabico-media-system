@@ -45,9 +45,7 @@ def build_sacred_geometry_prompt(item: dict) -> str:
     title = item.get("title", "EATHESEN Mathematical Architecture")
     nodes = ", ".join(item.get("pure_logic_nodes", [])[:4])
     
-    # =========================================================================
-    # MA TRẬN BIỂU TƯỢNG (SYMBOLISM MATRIX) - Ép AI vẽ đúng biểu tượng từng Đạo
-    # =========================================================================
+    # MA TRẬN BIỂU TƯỢNG (SYMBOLISM MATRIX)
     if dao_idx == 1:
         symbol = "a glowing mathematical torus and boolean logic circles"
     elif dao_idx == 2:
@@ -89,7 +87,9 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
     print(f"[CLOUDFLARE AI] Sending request to model: {CF_IMAGE_MODEL}")
     
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
-    payload = {"prompt": prompt, "seed": 24}
+    
+    # ĐÃ VÁ: Xóa tham số "seed": 24 vì Cloudflare API không cho phép
+    payload = {"prompt": prompt}
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=60)
@@ -114,6 +114,7 @@ def render_via_cloudflare(prompt: str) -> Optional[bytes]:
 
 def render_via_pollinations_fallback(prompt: str) -> Optional[bytes]:
     encoded = urllib.parse.quote(prompt)
+    # Pollinations vẫn hỗ trợ seed=24
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&seed=24"
     print("[FALLBACK] Sending request to Pollinations.ai (FLUX)...")
     try:
@@ -183,7 +184,6 @@ def main() -> int:
 
         if img_bytes and upload_image_to_hf(repo_id, filename, img_bytes):
             rendered_count += 1
-            # Nghỉ 3 giây sau mỗi lần render thành công để tránh Rate Limit
             time.sleep(3)
 
     print(f"[COMPLETE] Visual render cycle finished. New covers published: {rendered_count}.")
