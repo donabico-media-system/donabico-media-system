@@ -87,6 +87,19 @@ def verify_anchor_c24(obj: Any) -> bool:
     return False
 
 
+def normalize_dataset_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    repo_id = record.get("repo_id", "donabico/path-00000")
+    if "sequence" not in record:
+        try:
+            record["sequence"] = int(repo_id.split("-")[-1])
+        except ValueError:
+            record["sequence"] = 0
+    if "dao_index" not in record:
+        seq = record["sequence"]
+        record["dao_index"] = ((seq - 1) % 10) + 1 if seq > 0 else 1
+    return record
+
+
 def discover_parity_repositories(parity: str) -> List[str]:
     headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     url = f"https://huggingface.co/api/datasets?author={HF_ORG}&limit=10000"
@@ -117,7 +130,11 @@ def load_cached_parity_datasets(parity: str) -> Dict[str, Dict[str, Any]]:
     try:
         with open(cache_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {d["repo_id"]: d for d in data.get("datasets", []) if "repo_id" in d}
+        result = {}
+        for d in data.get("datasets", []):
+            if "repo_id" in d:
+                result[d["repo_id"]] = normalize_dataset_record(d)
+        return result
     except Exception:
         return {}
 
@@ -270,8 +287,9 @@ def write_cdn_artifacts(
     os.makedirs(CDN_DIR, exist_ok=True)
     now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    normalized_current = [normalize_dataset_record(dict(d)) for d in datasets]
     clean_datasets = []
-    for d in sorted(datasets, key=lambda x: x["sequence"]):
+    for d in sorted(normalized_current, key=lambda x: x["sequence"]):
         entry = {k: v for k, v in d.items() if not k.startswith("_")}
         clean_datasets.append(entry)
 
@@ -300,9 +318,13 @@ def write_cdn_artifacts(
         except Exception:
             other_datasets = []
 
-    merged_map = {d["repo_id"]: d for d in other_datasets}
+    merged_map: Dict[str, Dict[str, Any]] = {}
+    for d in other_datasets:
+        if "repo_id" in d:
+            merged_map[d["repo_id"]] = normalize_dataset_record(dict(d))
     for d in clean_datasets:
         merged_map[d["repo_id"]] = d
+
     merged_list = sorted(merged_map.values(), key=lambda x: x["sequence"])
 
     master_payload = {
@@ -339,7 +361,7 @@ def write_cdn_artifacts(
         ET.SubElement(item_el, "pubDate").text = item_data.get("audited_at", now_iso)
         ET.SubElement(item_el, "description").text = (
             f"Repo: {item_data['repo_id']} | Shannon Entropy H(X)={item_data['shannon_entropy']} | "
-            f"Tensor Variance={item_data['tensor_variance']} | Anchor: ¢24"
+            f"Tensor Variance={item_data.get('tensor_variance', 0.0)} | Anchor: ¢24"
         )
 
     tree = ET.ElementTree(rss)
