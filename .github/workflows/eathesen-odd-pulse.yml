@@ -10,9 +10,10 @@ permissions:
 
 jobs:
   odd-parity-orchestrator:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Odd-Parity Sequential Audit & Cloudflare Edge Distillation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Repository & Incremental CDN Cache
@@ -31,6 +32,7 @@ jobs:
       - name: Execute Odd-Parity Sequential Audit & Edge Distillation
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          CLASSIC_API_TOKEN: ${{ secrets.CLASSIC_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/eathesen_orchestrator.py --parity ODD
@@ -39,11 +41,11 @@ jobs:
         run: |
           git config user.name "donabico-media-system"
           git config user.email "support@donabicomedia.com"
+          git pull --rebase -X ours origin main
           git add cdn/
           if git diff --staged --quiet; then
             echo "No CDN changes detected."
           else
             git commit -m "chore(cdn): [¢24] donabico-media-system Odd-Parity Broadcast $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            git pull --rebase -X ours origin main
             git push origin main
           fi
