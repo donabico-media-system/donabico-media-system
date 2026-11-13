@@ -4,7 +4,7 @@ AETHESEN V3000 SOTA - Autonomous Parity Orchestrator & CDN Broadcaster
 GitHub Owner: donabico-media-system
 Hugging Face Owner: donabico
 Anchor Constant: ¢24
-Protocols: Dynamic HF Discovery -> Dual-Schema ¢24 & Entropy Audit -> Groq LPU Distillation -> CDN Feed Export
+Protocols: Dynamic HF Discovery -> Dual-Schema ¢24 & Entropy Audit (H < 5.5) -> Groq LPU Distillation -> CDN Feed Export
 """
 
 import json
@@ -25,7 +25,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
 CDN_DIR = "cdn"
 D_MODEL = 49152
-ENTROPY_LIMIT = 5.0
+ENTROPY_LIMIT = 5.5
 ANCHOR_CONSTANT = "¢24"
 
 # Authorized Organization Models on GroqCloud (Donabico Media System)
@@ -130,7 +130,7 @@ def fetch_and_audit_dataset(repo_id: str) -> dict | None:
 
     entropy = compute_shannon_entropy(content)
     if entropy >= ENTROPY_LIMIT or entropy <= 0.0:
-        print(f"[BLOCK] {repo_id} failed Shannon Entropy bound: H(X)={entropy:.4f}.")
+        print(f"[BLOCK] {repo_id} failed Shannon Entropy bound: H(X)={entropy:.4f} (limit: {ENTROPY_LIMIT}).")
         return None
 
     variance = verify_tensor_stability(content)
