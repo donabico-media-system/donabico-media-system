@@ -9,13 +9,14 @@ Target Storage: Hugging Face Dataset Repositories (donabico/path-XXXXX/cover-XXX
 import base64
 import json
 import os
+import re
 import sys
 import urllib.parse
 import requests
 
-CF_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
-HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
+CF_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
+CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
+HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
 MASTER_INDEX_PATH = "cdn/master-index.json"
 
 MAX_IMAGES_PER_PULSE = 12
@@ -53,16 +54,19 @@ def render_via_cloudflare(prompt: str) -> bytes | None:
     }
     payload = {
         "prompt": prompt,
-        "num_steps": 4,
     }
 
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=45)
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
         if resp.status_code == 200:
+            content_type = resp.headers.get("Content-Type", "")
+            if "image/" in content_type:
+                print("[CLOUDFLARE AI] FLUX.1-schnell binary image render succeeded.")
+                return resp.content
             data = resp.json()
             b64_img = data.get("result", {}).get("image")
             if b64_img:
-                print("[CLOUDFLARE AI] FLUX.1-schnell render succeeded.")
+                print("[CLOUDFLARE AI] FLUX.1-schnell base64 render succeeded.")
                 return base64.b64decode(b64_img)
         print(f"[WARN] Cloudflare Workers AI returned HTTP {resp.status_code}: {resp.text[:200]}")
     except Exception as exc:
