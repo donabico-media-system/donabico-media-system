@@ -24,12 +24,13 @@ HF_ORG = "donabico"
 GITHUB_OWNER = "donabico-media-system"
 GITHUB_REPO = "donabico-media-system"
 
+# Khai báo chính xác các biến môi trường
 CLASSIC_API_TOKEN = os.getenv("CLASSIC_API_TOKEN", "").strip().lstrip("\\")
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip().lstrip("\\")
 HF_AUTH_TOKEN = CLASSIC_API_TOKEN if CLASSIC_API_TOKEN else HF_TOKEN
 
-CF_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
-CF_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
+CLOUDFLARE_ACCOUNT_ID = re.sub(r"[^a-fA-F0-9]", "", os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip().lstrip("\\")
 
 MAX_SCALE_LIMIT = 10000
 CONSECUTIVE_MISS_STOP = 3
@@ -37,9 +38,7 @@ ENTROPY_LIMIT = 5.5
 TENSOR_DIM = 49152
 DISTILL_WINDOW_SIZE = 10
 EXCERPT_CHAR_LIMIT = 1200
-
-# NÂNG CẤP: Giới hạn thời gian chạy (giây) để tránh GitHub Actions kill ngang
-MAX_RUN_SECONDS = 6600  # ~110 phút (giới hạn 120 phút, chừa 10 phút buffer)
+MAX_RUN_SECONDS = 6600 
 
 AUTHORIZED_CF_TEXT_MODELS = [
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -110,7 +109,6 @@ def repository_exists(repo_id: str) -> bool:
     url = f"https://huggingface.co/api/datasets/{repo_id}"
     for attempt in range(1, 3):
         try:
-            # NÂNG CẤP: Dùng HEAD request thay vì GET để kiểm tra tồn tại (nhẹ hơn 10 lần)
             resp = requests.head(url, headers=headers, timeout=10)
             if resp.status_code == 200: return True
             if resp.status_code == 404: return False
@@ -194,13 +192,11 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
     verified_records: List[Dict[str, Any]] = []
     fresh_batch: List[Dict[str, Any]] = []
     consecutive_misses = 0
-    
-    start_time = time.time() # NÂNG CẤP: Bắt đầu đếm giờ chống timeout
+    start_time = time.time()
     
     print(f"[SEQUENTIAL SCAN] Starting ordered scan from path-{start_seq:05d} (step +2)...")
 
     for seq in range(start_seq, MAX_SCALE_LIMIT + 1, 2):
-        # NÂNG CẤP: Tự động dừng an toàn trước khi GitHub Actions kill
         if time.time() - start_time > MAX_RUN_SECONDS:
             print(f"[TIMEOUT GUARD] Reached {MAX_RUN_SECONDS}s limit. Safely stopping scan to prevent Action kill.")
             break
@@ -220,8 +216,6 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
 
         consecutive_misses = 0
         print(f"[SEQUENTIAL SCAN] Auditing {repo_id} ...")
-        
-        # NÂNG CẤP: Nghỉ 0.5s giữa các lần audit để chống Rate Limit HF
         time.sleep(0.5) 
         
         audited = audit_single_repository(repo_id)
@@ -235,7 +229,7 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
 
 def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     if not batch: return "No fresh datasets audited in current pulse; cached CDN records verified under ¢24 invariant."
-    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
+    if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
         print("[WARNING] Cloudflare credentials missing. Skipping AI distillation.")
         return "Cloudflare credentials not configured; deterministic metadata broadcast active."
 
@@ -244,12 +238,12 @@ def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
 
     system_prompt = "You are the EATHESEN V3000 Deterministic Knowledge Distiller operating under Anchor ¢24. Synthesize the provided verified datasets into a concise, high-precision executive abstract preserving exact axioms, mathematical invariants, and cross-Dao logical connections. Output plain structured prose without speculation."
     user_prompt = f"Parity Stream: {parity}\nSequential Verified Batch ({len(batch)} datasets):\n{corpus_block}\n\nProvide the distilled synthesis for the global CDN feed:"
-    headers = {"Authorization": f"Bearer {CF_API_TOKEN}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}", "Content-Type": "application/json"}
 
     for idx, model_name in enumerate(AUTHORIZED_CF_TEXT_MODELS):
         if idx > 0: time.sleep(2.0)
         print(f"[CLOUDFLARE AI] Attempting sequential distillation ({len(batch)} items) via: {model_name}")
-        url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{model_name}"
+        url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{model_name}"
         payload = {"temperature": 0.0, "max_tokens": 1024, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]}
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=45)
@@ -297,14 +291,10 @@ def write_cdn_artifacts(parity: str, datasets: List[Dict[str, Any]], distilled_s
 
     merged_list = sorted(merged_map.values(), key=lambda x: x["sequence"])
 
-    # =========================================================================
-    # NÂNG CẤP: PHÂN MẢNH DỮ LIỆU (SHARDING) ĐỂ TRÁNH PHÌNH FILE JSON
-    # =========================================================================
-    SHARD_SIZE = 1000  # Mỗi file part chứa tối đa 1000 items
+    SHARD_SIZE = 1000
     total_shards = (len(merged_list) + SHARD_SIZE - 1) // SHARD_SIZE
     shard_endpoints = {}
 
-    # Xóa các file part cũ (nếu có thay đổi số lượng part)
     for f in os.listdir(CDN_DIR):
         if f.startswith("master-index-part-") and f.endswith(".json"):
             os.remove(os.path.join(CDN_DIR, f))
@@ -317,17 +307,15 @@ def write_cdn_artifacts(parity: str, datasets: List[Dict[str, Any]], distilled_s
             json.dump({"total": len(part_data), "datasets": part_data}, f, ensure_ascii=False, indent=2)
         shard_endpoints[f"shard_{i+1:03d}"] = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/cdn/{part_name}"
 
-    # Master index chỉ chứa 100 items mới nhất làm đại diện + link trỏ đến các shard
     master_payload = {
         "system": "EATHESEN V3000 SOTA — Master Global Index (Sharded)",
         "anchor": "¢24", "boolean_checksum": 1, "updated_at": now_iso,
         "total_repositories": len(merged_list), "total_shards": total_shards,
         "shard_endpoints": shard_endpoints,
-        "recent_datasets": merged_list[-100:],  # 100 bài mới nhất cho RSS
+        "recent_datasets": merged_list[-100:],
     }
     with open(MASTER_INDEX_FILE, "w", encoding="utf-8") as f: json.dump(master_payload, f, ensure_ascii=False, indent=2)
 
-    # Cập nhật RSS Feed (chỉ lấy 50 bài mới nhất)
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     ET.SubElement(channel, "title").text = "EATHESEN V3000 SOTA — Autonomous Knowledge Stream [¢24]"
@@ -355,6 +343,7 @@ def main() -> int:
 
     print(f"=== [EATHESEN V3000 SHARDED PULSE] GitHub: {GITHUB_OWNER} | HF: {HF_ORG} | Mode: {parity} ===")
     if not HF_AUTH_TOKEN: print("[WARNING] Không tìm thấy CLASSIC_API_TOKEN hoặc HF_TOKEN. API Hugging Face có thể bị giới hạn.")
+    if not CLOUDFLARE_API_TOKEN: print("[WARNING] Không tìm thấy CLOUDFLARE_API_TOKEN.")
 
     cached_map = load_cached_parity_datasets(parity)
     final_list, fresh_batch = sequential_scan_and_audit(parity, cached_map)
