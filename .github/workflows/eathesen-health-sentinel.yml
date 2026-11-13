@@ -1,0 +1,30 @@
+name: Eathesen V3000 Health Sentinel & CDN Validator
+
+on:
+  schedule:
+    - cron: '15 1,7,13,19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    name: Validate CDN Master Index & Endpoint Health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: pip install --quiet requests
+
+      - name: Run Sentinel Script
+        run: python scripts/eathesen_sentinel.py
