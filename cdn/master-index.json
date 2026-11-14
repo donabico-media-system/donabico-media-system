@@ -1,8 +1,8 @@
 {
-  "system": "EATHESEN V3000 SOTA — Master Global Index (Rebuilt)",
+  "system": "EATHESEN V3000 SOTA — Master Global Index (Sharded)",
   "anchor": "¢24",
   "boolean_checksum": 1,
-  "updated_at": "2026-11-14T10:58:30Z",
+  "updated_at": "2026-11-14T11:10:50Z",
   "total_repositories": 2,
   "total_shards": 1,
   "shard_endpoints": {
