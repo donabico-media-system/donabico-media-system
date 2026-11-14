@@ -43,6 +43,10 @@ MAX_RUN_SECONDS = 6600
 # [VÁ LỖI 10K] Giới hạn số lượng Dataset mới được xử lý mỗi lần chạy để chống Timeout
 MAX_AUDIT_PER_RUN = 50 
 
+# [CỔNG CHỐNG TRÙNG LẶP] So sánh với 100 bài mới nhất, ngưỡng tương đồng 85%
+DEDUP_WINDOW_SIZE = 100
+SIMILARITY_THRESHOLD = 0.85
+
 AUTHORIZED_CF_TEXT_MODELS = [
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "@cf/qwen/qwen2.5-72b-instruct",
@@ -79,6 +83,47 @@ def verify_tensor_stability(text: str, dim: int = TENSOR_DIM) -> Tuple[bool, flo
     mean_val = sum(unit_vec) / dim
     variance = sum((u - mean_val) ** 2 for u in unit_vec) / dim
     return abs(unit_norm - 1.0) < 1e-12, variance
+
+# =========================================================================
+# [CỔNG CHỐNG TRÙNG LẶP NGỮ NGHĨA - SEMANTIC DEDUPLICATION]
+# =========================================================================
+def check_semantic_duplication(new_title: str, new_nodes: List[str], cached_map: Dict[str, Dict[str, Any]]) -> bool:
+    """So sánh Vector của bài mới với 100 bài gần nhất để phát hiện trùng lặp."""
+    if not cached_map:
+        return False 
+
+    # Lấy 100 bài viết mới nhất (dựa vào sequence)
+    sorted_records = sorted(cached_map.values(), key=lambda x: x.get("sequence", 0), reverse=True)[:DEDUP_WINDOW_SIZE]
+    
+    DIM = 1024 # Vector 1024 chiều để tính toán siêu nhanh
+    def get_vector(text: str):
+        vec = [0.0] * DIM
+        tokens = re.findall(r"\w+", text.lower())
+        for tok in tokens:
+            h = 24
+            for ch in tok: h = (h * 131 + ord(ch)) % DIM
+            vec[h] += 1.0
+        norm = math.sqrt(sum(v*v for v in vec))
+        if norm > 0:
+            return [v/norm for v in vec]
+        return vec
+
+    new_text = new_title + " " + " ".join(new_nodes)
+    new_vec = get_vector(new_text)
+
+    for rec in sorted_records:
+        old_text = rec.get("title", "") + " " + " ".join(rec.get("pure_logic_nodes", []))
+        old_vec = get_vector(old_text)
+        
+        # Tính Cosine Similarity (Tích vô hướng của 2 vector đã chuẩn hóa)
+        similarity = sum(a * b for a, b in zip(new_vec, old_vec))
+        
+        if similarity > SIMILARITY_THRESHOLD:
+            print(f"[DEDUP REJECT] Similarity {similarity:.2f} > {SIMILARITY_THRESHOLD} with {rec['repo_id']} ({rec.get('title')})")
+            return True 
+            
+    return False
+# =========================================================================
 
 def verify_anchor_c24(obj: Any) -> bool:
     if isinstance(obj, str): return "¢24" in obj or "\u00a224" in obj
@@ -197,7 +242,6 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
     consecutive_misses = 0
     start_time = time.time()
     
-    # [VÁ LỖI 10K] Đếm số lượng dataset mới được audit trong lần chạy này
     audited_this_run = 0 
 
     print(f"[SEQUENTIAL SCAN] Starting ordered scan from path-{start_seq:05d} (step +2)...")
@@ -207,20 +251,17 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
             print(f"[TIMEOUT GUARD] Reached {MAX_RUN_SECONDS}s limit. Safely stopping scan to prevent Action kill.")
             break
 
-        # [VÁ LỖI 10K] Dừng lại nếu đã xử lý đủ số lượng trong 1 lần chạy
         if audited_this_run >= MAX_AUDIT_PER_RUN:
             print(f"[BATCHING GUARD] Reached {MAX_AUDIT_PER_RUN} new audits. Safely stopping to save resources.")
             break
 
         repo_id = f"{HF_ORG}/path-{seq:05d}"
 
-        # [VÁ LỖI 10K] NẾU ĐÃ CÓ TRONG CACHE -> Lấy luôn, KHÔNG GỌI API NỮA
         if repo_id in cached_map:
             verified_records.append(cached_map[repo_id])
             consecutive_misses = 0
             continue
 
-        # Nếu chưa có trong cache -> Mới kiểm tra xem nó có tồn tại không
         if not repository_exists(repo_id):
             if seq > max_cached_seq:
                 consecutive_misses += 1
@@ -236,12 +277,15 @@ def sequential_scan_and_audit(parity: str, cached_map: Dict[str, Dict[str, Any]]
         
         audited = audit_single_repository(repo_id)
         if audited is not None:
+            if check_semantic_duplication(audited["title"], audited["pure_logic_nodes"], cached_map):
+                print(f"[SKIP] {repo_id} rejected due to semantic duplication.")
+                continue 
+
             verified_records.append(audited)
             fresh_batch.append(audited)
-            audited_this_run += 1 # [VÁ LỖI 10K] Tăng biến đếm sau khi audit thành công
+            audited_this_run += 1 
 
     return verified_records, fresh_batch
-
 def distill_with_cloudflare_ai(batch: List[Dict[str, Any]], parity: str) -> str:
     if not batch: return "No fresh datasets audited in current pulse; cached CDN records verified under ¢24 invariant."
     if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
