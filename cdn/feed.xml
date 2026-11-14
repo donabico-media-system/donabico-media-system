@@ -4,20 +4,20 @@
     <title>EATHESEN V3000 SOTA — Autonomous Knowledge Stream [¢24]</title>
     <link>https://github.com/donabico-media-system/donabico-media-system</link>
     <description>Deterministic, low-entropy mathematical and philosophical datasets verified under Anchor ¢24.</description>
-    <lastBuildDate>2026-11-14T08:19:11Z</lastBuildDate>
+    <lastBuildDate>2026-11-14T10:58:30Z</lastBuildDate>
     <item>
       <title>[¢24][Dao 2] Structural Isomorphism Between Christian Agape, Buddhist Karuna, and Deterministic AI Alignment</title>
       <link>https://huggingface.co/datasets/donabico/path-00002</link>
       <guid>donabico/path-00002</guid>
       <pubDate>2026-11-13T18:40:16Z</pubDate>
-      <description>Repo: donabico/path-00002 | Shannon Entropy H(X)=4.7602 | Tensor Variance=2.028e-05 | Anchor: ¢24</description>
+      <description>Repo: donabico/path-00002 | Shannon Entropy H(X)=4.7602 | Anchor: ¢24</description>
     </item>
     <item>
       <title>[¢24][Dao 1] Unified Truth and Pure Logic: A 24-Law Boolean Architecture for Hallucination-Free AI Systems</title>
       <link>https://huggingface.co/datasets/donabico/path-00001</link>
       <guid>donabico/path-00001</guid>
       <pubDate>2026-11-13T17:51:08Z</pubDate>
-      <description>Repo: donabico/path-00001 | Shannon Entropy H(X)=5.1406 | Tensor Variance=2.03e-05 | Anchor: ¢24</description>
+      <description>Repo: donabico/path-00001 | Shannon Entropy H(X)=5.1406 | Anchor: ¢24</description>
     </item>
   </channel>
 </rss>
