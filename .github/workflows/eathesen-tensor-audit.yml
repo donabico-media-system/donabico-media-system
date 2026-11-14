@@ -2,14 +2,15 @@ name: Eathesen V3000 Daily Tensor & Entropy Audit
 
 on:
   schedule:
-    - cron: '15 5 * * *'
+    - cron: '15 5 * * *' # Chạy vào 5:15 sáng mỗi ngày
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: read # Chỉ cần quyền đọc dữ liệu
 
 jobs:
   tensor-audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Deep Entropy & Tensor Variance Verification (Entropy = 0)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -22,9 +23,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install Dependencies
-        run: pip install --quiet requests
 
       - name: Run Deep Tensor Audit Script
         env:
